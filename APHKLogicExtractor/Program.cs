@@ -4,44 +4,38 @@ using APHKLogicExtractor.Loaders;
 using CommandLiners;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-IConfiguration config = new ConfigurationBuilder()
-    .AddCommandLineOptions(args.ToPosix())
-    .Build();
+HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
-IServiceCollection services = new ServiceCollection();
-services.AddOptions<CommandLineOptions>()
-    .Bind(config)
-    .ValidateDataAnnotations();
+builder.Configuration.Sources.Clear();
+builder.Configuration
+    .AddCommandLineOptions(args.ToPosix());
 
-IServiceProvider provider = services.BuildServiceProvider();
-IOptions<CommandLineOptions> optionsService = provider.GetRequiredService<IOptions<CommandLineOptions>>();
+builder.Services.AddOptions<CommandLineOptions>()
+    .Bind(builder.Configuration)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-using ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-ILogger logger = loggerFactory.CreateLogger<Program>();
-
-try
+builder.Services.AddSingleton(provider =>
 {
-    CommandLineOptions options = optionsService.Value;
-    DataLoader dataLoader = new(options.RefName);
-    LogicLoader logicLoader = new(options.RefName);
-
-    logger.LogInformation("Beginning extraction");
-    IExtractor[] extractors = new[]
-    {
-        new RegionExtractor()
-    };
-    await Task.WhenAll(extractors.Select(x => x.ExtractAsync(loggerFactory, options, dataLoader, logicLoader)));
-    logger.LogInformation("Completed extraction, output is in {}", Path.GetFullPath(options.OutputPath));
-}
-catch (OptionsValidationException ex)
+    IOptions<CommandLineOptions> options = provider.GetRequiredService<IOptions<CommandLineOptions>>();
+    return new DataLoader(options.Value.RefName);
+});
+builder.Services.AddSingleton(provider =>
 {
-    foreach (string failure in ex.Failures)
-    {
-        logger.LogError(failure);
-    }
-}
+    IOptions<CommandLineOptions> options = provider.GetRequiredService<IOptions<CommandLineOptions>>();
+    return new LogicLoader(options.Value.RefName);
+});
+builder.Services.AddHostedService<RegionExtractor>();
+
+IHost host = builder.Build();
+await host.StartAsync();
+IEnumerable<Task> tasks = host.Services.GetServices<IHostedService>()
+    .OfType<BackgroundService>()
+    .Where(x => x.ExecuteTask != null)
+    .Select(x => x.ExecuteTask!);
+await Task.WhenAll(tasks);
 
     

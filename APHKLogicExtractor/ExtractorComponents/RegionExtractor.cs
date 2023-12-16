@@ -1,16 +1,24 @@
 ﻿using APHKLogicExtractor.DataModel;
 using APHKLogicExtractor.Loaders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RandomizerCore.Logic;
 using System.Text.RegularExpressions;
 
 namespace APHKLogicExtractor.ExtractorComponents
 {
-    internal class RegionExtractor : IExtractor
+    internal class RegionExtractor(
+        ILogger<RegionExtractor> logger, 
+        IOptions<CommandLineOptions> optionsService,
+        DataLoader dataLoader, 
+        LogicLoader logicLoader
+    ) : BackgroundService
     {
-        public async Task ExtractAsync(ILoggerFactory loggerFactory, CommandLineOptions options, DataLoader dataLoader, LogicLoader logicLoader)
+        private CommandLineOptions options = optionsService.Value;
+
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
         {
-            ILogger logger = loggerFactory.CreateLogger<RegionExtractor>();
             logger.LogInformation("Validating options");
             bool overlap = options.ManualStatefulWaypoints.Intersect(options.ManualStatelessWaypoints).Any();
             if (overlap)
