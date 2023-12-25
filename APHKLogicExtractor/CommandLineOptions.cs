@@ -11,8 +11,6 @@
 
         public List<string> WarpWaypoints { get; set; } = new();
 
-        public string? WaypointStatefulnessRefName { get; set; }
-
         public HashSet<string> ManualStatefulWaypoints { get; set; } = new();
 
         public HashSet<string> ManualStatelessWaypoints { get; set; } = new();

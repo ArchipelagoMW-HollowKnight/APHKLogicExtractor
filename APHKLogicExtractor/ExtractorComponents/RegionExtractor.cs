@@ -11,7 +11,7 @@ namespace APHKLogicExtractor.ExtractorComponents
     internal class RegionExtractor(
         ILogger<RegionExtractor> logger, 
         IOptions<CommandLineOptions> optionsService,
-        DataLoader dataLoader, 
+        DataLoader dataLoader,
         LogicLoader logicLoader
     ) : BackgroundService
     {
@@ -44,8 +44,8 @@ namespace APHKLogicExtractor.ExtractorComponents
             Dictionary<string, string> statefulWaypointLogic = new();
             Dictionary<string, string> statelessWaypointLogic = new();
             Dictionary<string, string> warpWaypointLogic = new();
-
-            void PartitionWaypoint(RawWaypointDef waypoint, bool defaultStatelessness)
+            
+            foreach (RawWaypointDef waypoint in waypointLogic)
             {
                 if (warpWaypointMatchers.Any(x => x.IsMatch(waypoint.name)))
                 {
@@ -53,7 +53,7 @@ namespace APHKLogicExtractor.ExtractorComponents
                     return;
                 }
 
-                bool stateless = defaultStatelessness;
+                bool stateless = waypoint.stateless;
                 if (options.ManualStatelessWaypoints.Contains(waypoint.name))
                 {
                     if (options.ManualStatefulWaypoints.Contains(waypoint.name))
@@ -69,34 +69,6 @@ namespace APHKLogicExtractor.ExtractorComponents
 
                 Dictionary<string, string> dict = stateless ? statelessWaypointLogic : statefulWaypointLogic;
                 dict[waypoint.name] = waypoint.logic;
-            }
-
-            if (options.WaypointStatefulnessRefName != null)
-            {
-                LogicLoader altLoader = new(options.WaypointStatefulnessRefName);
-                var altWaypointLogic = await altLoader.LoadWaypoints();
-                Dictionary<string, bool> isWaypointStatelessByName = new();
-                foreach (RawWaypointDef waypoint in altWaypointLogic)
-                {
-                    isWaypointStatelessByName[waypoint.name] = waypoint.stateless;
-                }
-
-                foreach (RawWaypointDef waypoint in waypointLogic)
-                {
-                    if (!isWaypointStatelessByName.TryGetValue(waypoint.name, out bool stateless))
-                    {
-                        logger.LogWarning("Didn't find the waypoint {} in statefulness ref {}", waypoint.name, options.WaypointStatefulnessRefName);
-                        stateless = waypoint.stateless;
-                    }
-                    PartitionWaypoint(waypoint, stateless);
-                }
-            }
-            else
-            {
-                foreach (RawWaypointDef waypoint in waypointLogic)
-                {
-                    PartitionWaypoint(waypoint, waypoint.stateless);
-                }
             }
 
             logger.LogInformation("Partitioning logic objects by scene");
