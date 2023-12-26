@@ -11,11 +11,7 @@
 
         public List<string> WarpWaypoints { get; set; } = new();
 
-        public HashSet<string> ManualStatefulWaypoints { get; set; } = new();
-
-        public HashSet<string> ManualStatelessWaypoints { get; set; } = new();
-
-        public WaypointCycleHandling WaypointCycleHandling { get; set; } = WaypointCycleHandling.Crash;
+        public HashSet<string> IgnoredWaypoints { get; set; } = new();
 
         public List<string>? Scenes { get; set; }
 
