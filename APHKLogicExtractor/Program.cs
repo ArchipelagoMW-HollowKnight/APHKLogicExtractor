@@ -1,5 +1,5 @@
 ﻿using APHKLogicExtractor;
-using APHKLogicExtractor.ExtractorComponents;
+using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
 using APHKLogicExtractor.Loaders;
 using CommandLiners;
 using Microsoft.Extensions.Configuration;
