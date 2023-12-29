@@ -210,12 +210,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                         ).ToList();
                     }
                 }
-                // put back into a logic def to simplify
+                // simplify
+                clauses[node.Name] = RemoveRedundantClauses(clauses[node.Name]);
                 string readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
                 logger.LogInformation("Substitution stage 1 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
                 // substitute all self-referential waypoints, doing self-substitution in accordance to state modifier type
                 clauses[node.Name] = SubstituteSelfReferences(lm, clauses[node.Name], node.Name);
-                // put back into a logic def to simplify
                 readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
                 logger.LogInformation("Substitution stage 2 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
             }
@@ -274,7 +274,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 // we can discard the new clause regardless of boolean conditions, because it will get us the
                 // same or worse state as the original non-reference clause for the same or more amount of work.
 
-                // todo - Do a simplification pass on the non-self-reference clauses to try and reduce any redundancies
+                // Do a simplification pass on the non-self-reference clauses to try and reduce any redundancies
+                nonSelfReferenceClauses = RemoveRedundantClauses(nonSelfReferenceClauses);
             }
 
             return nonSelfReferenceClauses;
@@ -335,6 +336,35 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 lastPrefix = prefix;
             }
             return new StatefulClause(lm, clause.StateProvider, clause.Conditions, reducedStateModifiers);
+        }
+
+        private List<StatefulClause> RemoveRedundantClauses(List<StatefulClause> clauses)
+        {
+            List<StatefulClause> result = new(clauses);
+            for (int i = 0; i < result.Count - 1; i++)
+            {
+                StatefulClause ci = result[i];
+                for (int j = i + 1; j < result.Count; j++)
+                {
+                    StatefulClause cj = result[j];
+                    if (ci.IsSameOrBetterThan(cj))
+                    {
+                        // the left clause is better than the right clause. drop the right clause.
+                        // continuing the loop will select the correct right clause next.
+                        result.RemoveAt(j);
+                        j--;
+                    }
+                    else if (cj.IsSameOrBetterThan(ci))
+                    {
+                        // the right clause is better than the left clause. drop the left clause.
+                        // this will result in needing to select a new left clause so break out.
+                        result.RemoveAt(i);
+                        i--;
+                        break;
+                    }
+                }
+            }
+            return result;
         }
 
         private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)

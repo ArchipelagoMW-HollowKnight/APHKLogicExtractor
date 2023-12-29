@@ -143,6 +143,47 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return new StatefulClause(lm, sp, conditions, stateModifiers);
         }
 
+        /// <summary>
+        /// Determines whether this clause is an equivalent or better clause, that is, whether it will yield a state which is at least
+        /// as good as the other clause and has the same or fewer conditions on obtaining that state.
+        /// </summary>
+        public bool IsSameOrBetterThan(StatefulClause other)
+        {
+            // if the state provider is different this is already not a meaningful comparison.
+            if (StateProvider != other.StateProvider)
+            {
+                return false;
+            }
+
+            // ensure that we have better conditions (no more than) the other clause
+            if (!Conditions.IsSubsetOf(other.Conditions))
+            {
+                return false;
+            }
+
+            // ensure that we provide better state than the other clause. This is true if and only if:
+            // 1. We have at least as many state modifiers as the other clause
+            // 2. The first N state modifiers of this clause are exactly the same as the N state modifiers of that clause
+            // 3. Any additional state modifiers are strictly beneficial.
+            if (StateModifiers.Count < other.StateModifiers.Count)
+            {
+                return false;
+            }
+            int i = 0;
+            for (; i < other.StateModifiers.Count; i++)
+            {
+                if (StateModifiers[i] != other.StateModifiers[i])
+                {
+                    return false;
+                }
+            }
+            for (; i < StateModifiers.Count; i++)
+            {
+                throw new NotImplementedException("Haven't been bothered to factor state modifier classification into a useful place yet");
+            }
+            return true;
+        }
+
         public List<TermToken> ToTokens()
         {
             return [
