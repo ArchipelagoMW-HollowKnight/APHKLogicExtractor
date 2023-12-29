@@ -12,13 +12,6 @@ using System.Text.RegularExpressions;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
-    enum StateModifierKind
-    {
-        None,
-        Beneficial,
-        Detrimental,
-        Mixed
-    }
 
     internal class RegionExtractor(
         ILogger<RegionExtractor> logger,
@@ -184,12 +177,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private void SubstituteInPath(TraversalPath path, LogicManager lm, Dictionary<string, RawWaypointDef> statefulWaypoints)
         {
             logger.LogInformation("Performing substitution along path: {}", path.ToString());
-            Dictionary<string, List<List<TermToken>>> clauses = new();
+            Dictionary<string, List<StatefulClause>> clauses = new();
+            // todo - performance improvement, can choose only one node in the path to solve for cycle solving
             foreach (WaypointReferenceNode node in path.DistinctBy(x => x.Name))
             {
-                List<List<TermToken>> clausesForDef = GetDnfClauses(lm, node.Name);
+                List<StatefulClause> clausesForDef = GetDnfClauses(lm, node.Name);
                 clauses[node.Name] = clausesForDef;
-                string readable = string.Join(" | ", clausesForDef.Select(clause => "(" + string.Join(" + ", clause.Select(t => t.Write())) + ")"));
+                string readable = string.Join(" | ", clausesForDef.Select(clause => clause.ToString()));
                 logger.LogInformation("Substitution stage 0 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
             }
 
@@ -198,7 +192,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 // substitute all non-self-referential waypoints until there are only self-references
                 while (true)
                 {
-                    IEnumerable<string> referencesToSubstitute = clauses[node.Name].SelectMany(x => x)
+                    IEnumerable<string> referencesToSubstitute = clauses[node.Name].SelectMany(x => x.ToTokens())
                         .OfType<SimpleToken>()
                         .Select(x => x.Name)
                         .Where(x => statefulWaypoints.ContainsKey(x) && x != node.Name)
@@ -209,7 +203,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     }
                     foreach(string reference in referencesToSubstitute)
                     {
-                        clauses[node.Name] = SubstituteClausesForToken(
+                        clauses[node.Name] = SubstituteInExpression(
                             clauses[node.Name], 
                             reference, 
                             GetDnfClauses(lm, reference)
@@ -217,75 +211,44 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     }
                 }
                 // put back into a logic def to simplify
-                clauses[node.Name] = SimplifyClauses(lm, node.Name, clauses[node.Name]);
-                string readable = string.Join(" | ", clauses[node.Name].Select(clause => "(" + string.Join(" + ", clause.Select(t => t.Write())) + ")"));
+                string readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
                 logger.LogInformation("Substitution stage 1 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
                 // substitute all self-referential waypoints, doing self-substitution in accordance to state modifier type
                 clauses[node.Name] = SubstituteSelfReferences(lm, clauses[node.Name], node.Name);
                 // put back into a logic def to simplify
-                clauses[node.Name] = SimplifyClauses(lm, node.Name, clauses[node.Name]);
-                readable = string.Join(" | ", clauses[node.Name].Select(clause => "(" + string.Join(" + ", clause.Select(t => t.Write())) + ")"));
+                readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
                 logger.LogInformation("Substitution stage 2 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
             }
         }
 
-        private IEnumerable<List<TermToken>> SubstituteClausesForToken(List<List<TermToken>> substituteInto, string tokenToSubst, List<List<TermToken>> substitution)
+        private IEnumerable<StatefulClause> SubstituteInExpression(List<StatefulClause> substituteInto, string tokenToSubst, List<StatefulClause> substitution)
         {
-            foreach (List<TermToken> clause in substituteInto)
+            foreach (StatefulClause clause in substituteInto)
             {
-                int i = clause.FindIndex(x => x is SimpleToken st && st.Name == tokenToSubst);
-                if (i == -1)
+                foreach (StatefulClause newClause in clause.SubstituteReference(tokenToSubst, substitution))
                 {
-                    // if there are no substitutions needed, keep the clause intact and unmodified
-                    yield return new List<TermToken>(clause);
-                    continue;
-                }
-                foreach (List<TermToken> c in substitution)
-                {
-                    List<TermToken> newClause = new(clause);
-                    newClause.RemoveAt(i);
-                    newClause.InsertRange(i, c);
                     yield return newClause;
                 }
             }
         }
 
-        private List<List<TermToken>> SubstituteSelfReferences(LogicManager lm, List<List<TermToken>> substituteInto, string tokenToSubst)
+        private List<StatefulClause> SubstituteSelfReferences(LogicManager lm, List<StatefulClause> substituteInto, string tokenToSubst)
         {
-            List<List<TermToken>> nonSelfReferenceClauses = [];
-            List<List<TermToken>> selfReferenceClauses = [];
-            foreach (List<TermToken> clause in substituteInto)
+            var groupings = substituteInto.GroupBy(x => x.ClassifySelfReferentialityOrThrow(tokenToSubst))
+                .ToDictionary(g => g.Key, g => g.ToList());
+            List<StatefulClause> nonSelfReferenceClauses = groupings[false];
+            foreach (StatefulClause selfReference in groupings[true])
             {
-                int i = clause.FindIndex(x => x is SimpleToken st && st.Name == tokenToSubst);
-                if (i == -1)
-                {
-                    nonSelfReferenceClauses.Add(new List<TermToken>(clause));
-                }
-                else
-                {
-                    selfReferenceClauses.Add(new List<TermToken>(clause));
-                }
-            }
-            foreach (List<TermToken> selfReference in selfReferenceClauses)
-            {
-                // collect all the state modifiers and determine what kind they are
-                var (booleanConditions, stateModifiers, kind) = PartitionClause(selfReference, tokenToSubst);
-                int i = selfReference.FindIndex(x => x is SimpleToken st && st.Name == tokenToSubst);
+                StateModifierKind kind = ClassifyStateModifiers(selfReference);
 
                 if (kind == StateModifierKind.Mixed)
                 {
-                    // in this case, we are substituting every self-reference clause into this self-reference clause.
-                    // it is not clear whether the state modifier will improve state or not so we can't take shortcuts here
-                    List<List<TermToken>> newClauses = [];
-                    foreach (List<TermToken> clause in nonSelfReferenceClauses)
+                    // in this case, we are substituting every self-reference clause into this self-reference clause and
+                    // duplicating the original. it is unclear whether the state modifier will improve state, so no shortcuts.
+                    List<StatefulClause> newClauses = [];
+                    foreach (StatefulClause clause in nonSelfReferenceClauses)
                     {
-                        var (substConditions, substModifiers, _) = PartitionClause(clause, null);
-                        List<TermToken> newClause = [
-                            .. substConditions.Concat(booleanConditions).Distinct(),
-                            .. substModifiers,
-                            .. stateModifiers
-                        ];
-                        newClauses.Add(ReduceStateModifiersForClause(newClause));
+                        newClauses.Add(ReduceStateModifiersForClause(lm, selfReference.SubstituteStateProvider(clause)));
                     }
                     nonSelfReferenceClauses.AddRange(newClauses);
                 }
@@ -294,18 +257,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     // in this case, we are essentially doing the same thing as above. However, there is a shortcut we can take:
                     // if the boolean conditions on the non-reference clause are a superset of the conditions on the reference
                     // clause (ie, if the clause we are substituting into has fewer requirements), we can drop the old clause
-                    // because the substitution will yield a better state for the same amount of work
-                    List<List<TermToken>> newClauses = [];
-                    foreach (List<TermToken> clause in nonSelfReferenceClauses)
+                    // because the substitution will yield a better state for the same (or less) amount of work
+                    List<StatefulClause> newClauses = [];
+                    foreach (StatefulClause clause in nonSelfReferenceClauses)
                     {
-                        var (substConditions, substModifiers, _) = PartitionClause(clause, null);
-                        List<TermToken> newClause = [
-                            .. substConditions.Concat(booleanConditions).Distinct(),
-                            .. substModifiers,
-                            .. stateModifiers
-                        ];
-                        newClauses.Add(ReduceStateModifiersForClause(newClause));
-                        if (!substConditions.ToHashSet().IsSupersetOf(booleanConditions))
+                        StatefulClause newClause = selfReference.SubstituteStateProvider(clause);
+                        newClauses.Add(ReduceStateModifiersForClause(lm, newClause));
+                        if (!clause.Conditions.IsSupersetOf(selfReference.Conditions))
                         {
                             newClauses.Add(clause);
                         }
@@ -316,31 +274,20 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 // we can discard the new clause regardless of boolean conditions, because it will get us the
                 // same or worse state as the original non-reference clause for the same or more amount of work.
 
-                // Do a simplification pass on the non-self-reference clauses to try and reduce any redundancies
-                nonSelfReferenceClauses = SimplifyClauses(lm, tokenToSubst, nonSelfReferenceClauses);
+                // todo - Do a simplification pass on the non-self-reference clauses to try and reduce any redundancies
             }
 
             return nonSelfReferenceClauses;
         }
 
-        private (List<TermToken> conditions, List<TermToken> modifiers, StateModifierKind kind) 
-            PartitionClause(List<TermToken> clause, string? tokenToSubst)
+        private StateModifierKind ClassifyStateModifiers(StatefulClause clause)
         {
-            List<TermToken> booleanConditions = [];
-            List<TermToken> stateModifiers = [];
             StateModifierKind kind = StateModifierKind.None;
-            foreach (TermToken token in clause)
+            foreach (SimpleToken st in clause.StateModifiers)
             {
-                if (token is not SimpleToken st)
-                {
-                    booleanConditions.Add(token);
-                    continue;
-                }
-
                 string prefix = GetPrefix(st.Name);
                 if (BeneficialStateModifiers.Contains(prefix))
                 {
-                    stateModifiers.Add(st);
                     if (kind == StateModifierKind.None)
                     {
                         kind = StateModifierKind.Beneficial;
@@ -352,7 +299,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
                 else if (DetrimentalStateModifiers.Contains(prefix))
                 {
-                    stateModifiers.Add(st);
                     if (kind == StateModifierKind.None)
                     {
                         kind = StateModifierKind.Detrimental;
@@ -364,31 +310,20 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
                 else if (OtherStateModifiers.Contains(prefix))
                 {
-                    stateModifiers.Add(st);
                     kind = StateModifierKind.Mixed;
-                }
-                else if (st.Name != tokenToSubst)
-                {
-                    booleanConditions.Add(st);
                 }
             }
 
-            return (booleanConditions, stateModifiers, kind);
+            return kind;
         }
 
-        private List<TermToken> ReduceStateModifiersForClause(List<TermToken> clause)
+        private StatefulClause ReduceStateModifiersForClause(LogicManager lm, StatefulClause clause)
         {
             string lastPrefix = "";
-            List<TermToken> result = [];
-            foreach (TermToken token in clause)
+            List<SimpleToken> reducedStateModifiers = [];
+            foreach (SimpleToken token in clause.StateModifiers)
             {
-                if (token is not SimpleToken st)
-                {
-                    result.Add(token);
-                    continue;
-                }
-
-                string prefix = GetPrefix(st.Name);
+                string prefix = GetPrefix(token.Name);
 
                 // skip redundant setters
                 if (prefix == lastPrefix && StateSetters.Contains(prefix))
@@ -396,20 +331,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     continue;
                 }
 
-                // todo - this is a domain-specific reduction, find a general way
-                // back-to-back shade skips are impossible
-                if (prefix == "$SHADESKIP" && lastPrefix == "$SHADESKIP")
-                {
-                    return [ConstToken.False];
-                }
-
-                result.Add(token);
+                reducedStateModifiers.Add(token);
                 lastPrefix = prefix;
             }
-            return result;
+            return new StatefulClause(lm, clause.StateProvider, clause.Conditions, reducedStateModifiers);
         }
 
-        private List<List<TermToken>> GetDnfClauses(LogicManager lm, string name)
+        private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)
         {
             LogicDef def = lm.GetLogicDefStrict(name);
             if (def is not DNFLogicDef dd)
@@ -417,39 +345,20 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 logger.LogWarning("Logic definition for {} was not available in DNF form, creating", def.Name);
                 dd = lm.CreateDNFLogicDef(def.Name, def.ToLogicClause());
             }
-            return GetDnfClauses(dd);
+            return GetDnfClauses(lm, dd);
         }
 
-        private List<List<TermToken>> GetDnfClauses(DNFLogicDef dd)
+        private List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd)
         {
             Array statePaths = (Array)pathsField.GetValue(dd)!;
-            List<List<TermToken>> clausesForDef = [];
+            List<StatefulClause> clausesForDef = [];
             foreach (object statePath in statePaths)
             {
                 IEnumerable<IEnumerable<TermToken>> clausesForPath
                     = (IEnumerable<IEnumerable<TermToken>>)toTermTokenSequence.Invoke(statePath, [])!;
-                clausesForDef.AddRange(clausesForPath.Select(x => x.ToList()).ToList());
+                clausesForDef.AddRange(clausesForPath.Select(x => new StatefulClause(lm, x.ToList())).ToList());
             }
             return clausesForDef;
-        }
-
-        private List<List<TermToken>> SimplifyClauses(LogicManager lm, string name, List<List<TermToken>> clauses)
-        {
-            IEnumerable<LogicToken> tokens = RPN.OperateOver(
-                    clauses.Select(clause => RPN.OperateOver(clause, OperatorToken.AND)),
-                    OperatorToken.OR);
-            if (!tokens.Any())
-            {
-                tokens = tokens.Append(ConstToken.False);
-            }
-            DNFLogicDef simplified = CreateDnfLogicDef(lm, tokens.ToList());
-            return GetDnfClauses(simplified);
-        }
-
-        private DNFLogicDef CreateDnfLogicDef(LogicManager lm, List<LogicToken> tokens)
-        {
-            object builder = Activator.CreateInstance(logicDefBuilder, [lm])!;
-            return (DNFLogicDef)createDnfLogicDef.Invoke(builder, ["", "", tokens])!;
         }
 
         private string GetPrefix(string term)
