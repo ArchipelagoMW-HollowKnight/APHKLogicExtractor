@@ -4,14 +4,6 @@ using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
-    internal enum StateModifierKind
-    {
-        None,
-        Beneficial,
-        Detrimental,
-        Mixed
-    }
-
     internal class StatefulClause
     {
         private readonly LogicManager lm;
@@ -147,7 +139,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         /// Determines whether this clause is an equivalent or better clause, that is, whether it will yield a state which is at least
         /// as good as the other clause and has the same or fewer conditions on obtaining that state.
         /// </summary>
-        public bool IsSameOrBetterThan(StatefulClause other)
+        public bool IsSameOrBetterThan(StatefulClause other, StateModifierClassifier classifier)
         {
             // if the state provider is different this is already not a meaningful comparison.
             if (StateProvider != other.StateProvider)
@@ -161,25 +153,37 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 return false;
             }
 
-            // ensure that we provide better state than the other clause. This is true if and only if:
-            // 1. We have at least as many state modifiers as the other clause
-            // 2. The first N state modifiers of this clause are exactly the same as the N state modifiers of that clause
-            // 3. Any additional state modifiers are strictly beneficial.
-            if (StateModifiers.Count < other.StateModifiers.Count)
-            {
-                return false;
-            }
+            // ensure that we provide better state than the other clause.
             int i = 0;
-            for (; i < other.StateModifiers.Count; i++)
+            // state modifiers must all match for the shorter list
+            for (; i < StateModifiers.Count && i < other.StateModifiers.Count; i++)
             {
                 if (StateModifiers[i] != other.StateModifiers[i])
                 {
                     return false;
                 }
             }
-            for (; i < StateModifiers.Count; i++)
+            if (StateModifiers.Count > other.StateModifiers.Count)
             {
-                throw new NotImplementedException("Haven't been bothered to factor state modifier classification into a useful place yet");
+                // in this case, any additional modifiers must be strictly beneficial
+                for (; i < StateModifiers.Count; i++)
+                {
+                    if (classifier.ClassifySingle(StateModifiers[i]) != StateModifierKind.Beneficial)
+                    {
+                        return false;
+                    }
+                }
+            }
+            if (other.StateModifiers.Count > StateModifiers.Count)
+            {
+                // in this case, any additional modifiers must be strictly detrimental
+                for (; i < other.StateModifiers.Count; i++)
+                {
+                    if (classifier.ClassifySingle(other.StateModifiers[i]) != StateModifierKind.Detrimental)
+                    {
+                        return false;
+                    }
+                }
             }
             return true;
         }

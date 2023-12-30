@@ -17,7 +17,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         ILogger<RegionExtractor> logger,
         IOptions<CommandLineOptions> optionsService,
         DataLoader dataLoader,
-        LogicLoader logicLoader
+        LogicLoader logicLoader,
+        TermPrefixParser prefixParser,
+        StateModifierClassifier stateClassifier
     ) : BackgroundService
     {
         private static FieldInfo pathsField = typeof(DNFLogicDef)
@@ -30,29 +32,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private static MethodInfo createDnfLogicDef = logicDefBuilder.GetMethod("CreateDNFLogicDef")!;
 
         // todo - consume these as input
-        // todo - benchreset and hotspringreset should be default mixed as they are derived from named states
-        private static readonly HashSet<string> BeneficialStateModifiers = [
-            "$BENCHRESET",
-            "$FLOWERGET",
-            "$HOTSPRINGRESET",
-            "$REGAINSOUL"
-        ];
-        private static readonly HashSet<string> DetrimentalStateModifiers = [
-            "$SHADESKIP",
-            "$SPENDSOUL",
-            "$TAKEDAMAGE",
-            "$EQUIPCHARM",
-            "$STAGSTATEMODIFIER"
-        ];
-        private static readonly HashSet<string> OtherStateModifiers = [
-            "$CASTSPELL",
-            "$SHRIEKPOGO",
-            "$SLOPEBALL",
-            "$SAVEQUITRESET",
-            "$STARTRESPAWN",
-            "$WARPTOBENCH",
-            "$WARPTOSTART"
-        ];
         // these only set state unconditionally and therefore are completely redundant when appearing in sequence
         private static readonly HashSet<string> StateSetters = [
             "$FLOWERGET",
@@ -130,7 +109,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 .Distinct(new TraversalPath.Matcher());
             foreach (TraversalPath cycle in cyclesToSolve)
             {
-                SubstituteInPath(cycle, preprocessorLm, statefulWaypoints);
+                SolveCyclicPath(cycle, preprocessorLm, statefulWaypoints);
             }
 
             //foreach (TraversalPath path in waypointReferenceGraph.ToPaths())
@@ -174,42 +153,36 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return graph;
         }
 
-        private void SubstituteInPath(TraversalPath path, LogicManager lm, Dictionary<string, RawWaypointDef> statefulWaypoints)
+        private void SolveCyclicPath(TraversalPath path, LogicManager lm, Dictionary<string, RawWaypointDef> statefulWaypoints)
         {
             logger.LogInformation("Performing substitution along path: {}", path.ToString());
             Dictionary<string, List<StatefulClause>> clauses = new();
-            // todo - performance improvement, can choose only one node in the path to solve for cycle solving
-            foreach (WaypointReferenceNode node in path.DistinctBy(x => x.Name))
+            // get all referenced logic as well as we may need to solve for that too
+            Queue<string> processingQueue = new(path.Select(x => x.Name).Distinct());
+            while (processingQueue.TryDequeue(out string? next))
             {
-                List<StatefulClause> clausesForDef = GetDnfClauses(lm, node.Name);
-                clauses[node.Name] = clausesForDef;
+                if (clauses.ContainsKey(next))
+                {
+                    continue;
+                }
+
+                List<StatefulClause> clausesForDef = GetDnfClauses(lm, next);
+                clauses[next] = clausesForDef;
                 string readable = string.Join(" | ", clausesForDef.Select(clause => clause.ToString()));
-                logger.LogInformation("Substitution stage 0 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
+                logger.LogInformation("Substitution stage 0 - DNF'd and simplified to clauses for {}: {}", next, readable);
+
+                IEnumerable<string> unprocessedReferences = GetNonSelfReferences(clauses[next], next, statefulWaypoints)
+                    .Where(x => !clauses.ContainsKey(x));
+                foreach (string reference in unprocessedReferences)
+                {
+                    processingQueue.Enqueue(reference);
+                }
             }
+
+            // goal: reduce all logic references one at a time in sequence. This can be accomplished by performing substitutions
 
             foreach (WaypointReferenceNode node in path)
             {
-                // substitute all non-self-referential waypoints until there are only self-references
-                while (true)
-                {
-                    IEnumerable<string> referencesToSubstitute = clauses[node.Name].SelectMany(x => x.ToTokens())
-                        .OfType<SimpleToken>()
-                        .Select(x => x.Name)
-                        .Where(x => statefulWaypoints.ContainsKey(x) && x != node.Name)
-                        .Distinct();
-                    if (!referencesToSubstitute.Any())
-                    {
-                        break;
-                    }
-                    foreach(string reference in referencesToSubstitute)
-                    {
-                        clauses[node.Name] = SubstituteInExpression(
-                            clauses[node.Name], 
-                            reference, 
-                            GetDnfClauses(lm, reference)
-                        ).ToList();
-                    }
-                }
                 // simplify
                 clauses[node.Name] = RemoveRedundantClauses(clauses[node.Name]);
                 string readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
@@ -219,6 +192,15 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
                 logger.LogInformation("Substitution stage 2 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
             }
+        }
+
+        private IEnumerable<string> GetNonSelfReferences(List<StatefulClause> clauses, string name, Dictionary<string, RawWaypointDef> statefulWaypoints)
+        {
+            return clauses.SelectMany(x => x.ToTokens())
+                .OfType<SimpleToken>()
+                .Select(x => x.Name)
+                .Where(x => statefulWaypoints.ContainsKey(x) && x != name)
+                .Distinct();
         }
 
         private IEnumerable<StatefulClause> SubstituteInExpression(List<StatefulClause> substituteInto, string tokenToSubst, List<StatefulClause> substitution)
@@ -239,7 +221,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             List<StatefulClause> nonSelfReferenceClauses = groupings[false];
             foreach (StatefulClause selfReference in groupings[true])
             {
-                StateModifierKind kind = ClassifyStateModifiers(selfReference);
+                StateModifierKind kind = stateClassifier.ClassifyMany(selfReference.StateModifiers);
 
                 if (kind == StateModifierKind.Mixed)
                 {
@@ -281,50 +263,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return nonSelfReferenceClauses;
         }
 
-        private StateModifierKind ClassifyStateModifiers(StatefulClause clause)
-        {
-            StateModifierKind kind = StateModifierKind.None;
-            foreach (SimpleToken st in clause.StateModifiers)
-            {
-                string prefix = GetPrefix(st.Name);
-                if (BeneficialStateModifiers.Contains(prefix))
-                {
-                    if (kind == StateModifierKind.None)
-                    {
-                        kind = StateModifierKind.Beneficial;
-                    }
-                    else if (kind == StateModifierKind.Detrimental)
-                    {
-                        kind = StateModifierKind.Mixed;
-                    }
-                }
-                else if (DetrimentalStateModifiers.Contains(prefix))
-                {
-                    if (kind == StateModifierKind.None)
-                    {
-                        kind = StateModifierKind.Detrimental;
-                    }
-                    else if (kind == StateModifierKind.Beneficial)
-                    {
-                        kind = StateModifierKind.Mixed;
-                    }
-                }
-                else if (OtherStateModifiers.Contains(prefix))
-                {
-                    kind = StateModifierKind.Mixed;
-                }
-            }
-
-            return kind;
-        }
-
         private StatefulClause ReduceStateModifiersForClause(LogicManager lm, StatefulClause clause)
         {
             string lastPrefix = "";
             List<SimpleToken> reducedStateModifiers = [];
             foreach (SimpleToken token in clause.StateModifiers)
             {
-                string prefix = GetPrefix(token.Name);
+                string prefix = prefixParser.GetPrefix(token.Name);
 
                 // skip redundant setters
                 if (prefix == lastPrefix && StateSetters.Contains(prefix))
@@ -347,14 +292,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 for (int j = i + 1; j < result.Count; j++)
                 {
                     StatefulClause cj = result[j];
-                    if (ci.IsSameOrBetterThan(cj))
+                    if (ci.IsSameOrBetterThan(cj, stateClassifier))
                     {
                         // the left clause is better than the right clause. drop the right clause.
                         // continuing the loop will select the correct right clause next.
                         result.RemoveAt(j);
                         j--;
                     }
-                    else if (cj.IsSameOrBetterThan(ci))
+                    else if (cj.IsSameOrBetterThan(ci, stateClassifier))
                     {
                         // the right clause is better than the left clause. drop the left clause.
                         // this will result in needing to select a new left clause so break out.
@@ -389,23 +334,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 clausesForDef.AddRange(clausesForPath.Select(x => new StatefulClause(lm, x.ToList())).ToList());
             }
             return clausesForDef;
-        }
-
-        private string GetPrefix(string term)
-        {
-            int x = term.IndexOf('[');
-            int y = term.IndexOf(']');
-            // various possible problem cases why an arbitrary string might have this operation well-defined.
-            // Should not ever come up in theory but better to explode if it did
-            if (y < x || (y != -1 && y < term.Length - 1) || x == 0 || (x == -1 && y != -1))
-            {
-                throw new ArgumentException("Not a valid term to find prefix", nameof(term));
-            }
-            if (x == -1)
-            {
-                return term;
-            }
-            return term[0..x];
         }
     }
 }
