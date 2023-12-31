@@ -10,31 +10,30 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         Mixed
     }
 
-    internal class StateModifierClassifier(TermPrefixParser prefixParser)
+    internal class StateModifierClassifier(VariableParser prefixParser)
     {
         // todo - consume these from input
-        // todo - benchreset and hotspringreset should be default mixed as they are derived from named states
         private static readonly HashSet<string> BeneficialStateModifiers = [
-            "$BENCHRESET",
+            "$BENCHRESET", // derived from named state, could be mixed but default beneficially resets most fields
             "$FLOWERGET",
-            "$HOTSPRINGRESET",
-            "$REGAINSOUL"
+            "$HOTSPRINGRESET", // derived from named state, could be mixed but default fills soul
+            "$REGAINSOUL",
+            "$STARTRESPAWN", // derived from named state, could be mixed but default recovers soul and HP from start location
         ];
         private static readonly HashSet<string> DetrimentalStateModifiers = [
             "$SHADESKIP",
             "$SPENDSOUL",
             "$TAKEDAMAGE",
             "$EQUIPCHARM",
-            "$STAGSTATEMODIFIER"
+            "$STAGSTATEMODIFIER",
+            "$SAVEQUITRESET", // derived from named state, could be mixed but default just removes soul on save/quit or warp
         ];
         private static readonly HashSet<string> OtherStateModifiers = [
             "$CASTSPELL",
             "$SHRIEKPOGO",
             "$SLOPEBALL",
-            "$SAVEQUITRESET",
-            "$STARTRESPAWN",
-            "$WARPTOBENCH",
-            "$WARPTOSTART"
+            "$WARPTOBENCH", // derived from named state (savequitreset + benchreset)
+            "$WARPTOSTART", // derived from named state (savequitreset + startrespawn)
         ];
 
         public StateModifierKind ClassifySingle(TermToken token)
@@ -44,7 +43,17 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 return StateModifierKind.None;
             }
 
-            string prefix = prefixParser.GetPrefix(st.Name);
+            (string prefix, string[] args) = prefixParser.Parse(st.Name);
+            if (prefix == "$CASTSPELL" || prefix == "$SLOPEBALL" || prefix == "$SHRIEKPOGO")
+            {
+                // without any soul gain, we can actually classify these as definitely detrimental
+                if (args.Any(x => x.StartsWith("before:") || x.StartsWith("after:")))
+                {
+                    return StateModifierKind.Detrimental;
+                }
+                return StateModifierKind.Mixed;
+            }
+
             if (BeneficialStateModifiers.Contains(prefix))
             {
                 return StateModifierKind.Beneficial;

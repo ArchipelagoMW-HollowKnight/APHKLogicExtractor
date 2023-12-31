@@ -154,38 +154,58 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
 
             // ensure that we provide better state than the other clause.
+            if (StateModifiers.Count >= other.StateModifiers.Count)
+            {
+                // if we have more modifiers, they must all be good for this to be definitively better
+                // we can also use this case to check equality if lists are the same length as the sublist should
+                // still be found with no extras
+                return HasSublistWithAdditionalModifiersOfKind(StateModifiers, other.StateModifiers, classifier, StateModifierKind.Beneficial);
+            }
+            else
+            {
+                // if the other clause has more modifiers, then they must all be bad for this to be definitively better
+                return HasSublistWithAdditionalModifiersOfKind(other.StateModifiers, StateModifiers, classifier, StateModifierKind.Detrimental);
+            }
+        }
+
+        private bool HasSublistWithAdditionalModifiersOfKind(
+            IReadOnlyList<SimpleToken> list, 
+            IReadOnlyList<SimpleToken> sublist, 
+            StateModifierClassifier classifier,
+            StateModifierKind kind)
+        {
             int i = 0;
-            // state modifiers must all match for the shorter list
-            for (; i < StateModifiers.Count && i < other.StateModifiers.Count; i++)
+            for (; i + sublist.Count <= list.Count; i++)
             {
-                if (StateModifiers[i] != other.StateModifiers[i])
+                int j = 0;
+                for (; j < sublist.Count; j++)
                 {
-                    return false;
-                }
-            }
-            if (StateModifiers.Count > other.StateModifiers.Count)
-            {
-                // in this case, any additional modifiers must be strictly beneficial
-                for (; i < StateModifiers.Count; i++)
-                {
-                    if (classifier.ClassifySingle(StateModifiers[i]) != StateModifierKind.Beneficial)
+                    if (list[i + j] != sublist[j])
                     {
-                        return false;
+                        // assuming that the sublist check will pass, then the first element we checked is extra.
+                        if (classifier.ClassifySingle(list[i]) != kind)
+                        {
+                            return false;
+                        }
+                        break;
                     }
                 }
-            }
-            if (other.StateModifiers.Count > StateModifiers.Count)
-            {
-                // in this case, any additional modifiers must be strictly detrimental
-                for (; i < other.StateModifiers.Count; i++)
+                // the whole sublist was matched, check the rest of the list
+                if (j == sublist.Count)
                 {
-                    if (classifier.ClassifySingle(other.StateModifiers[i]) != StateModifierKind.Detrimental)
+                    for (int k = i + j; k < list.Count; k++)
                     {
-                        return false;
+                        if (classifier.ClassifySingle(list[k]) != kind)
+                        {
+                            return false;
+                        }
                     }
+                    // all the classifications passed and the sublist matched so we are good
+                    return true;
                 }
             }
-            return true;
+            // we never matched the sublist
+            return false;
         }
 
         public List<TermToken> ToTokens()

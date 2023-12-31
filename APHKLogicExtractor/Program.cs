@@ -28,8 +28,9 @@ builder.Services.AddSingleton(provider =>
     IOptions<CommandLineOptions> options = provider.GetRequiredService<IOptions<CommandLineOptions>>();
     return new LogicLoader(options.Value.RefName);
 });
-builder.Services.AddSingleton<TermPrefixParser>();
+builder.Services.AddSingleton<VariableParser>();
 builder.Services.AddSingleton<StateModifierClassifier>();
+builder.Services.AddSingleton<StateModifierReducer>();
 builder.Services.AddHostedService<RegionExtractor>();
 
 IHost host = builder.Build();

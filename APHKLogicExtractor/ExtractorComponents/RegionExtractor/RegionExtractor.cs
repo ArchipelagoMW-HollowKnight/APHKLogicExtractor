@@ -18,8 +18,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         IOptions<CommandLineOptions> optionsService,
         DataLoader dataLoader,
         LogicLoader logicLoader,
-        TermPrefixParser prefixParser,
-        StateModifierClassifier stateClassifier
+        StateModifierClassifier stateClassifier,
+        StateModifierReducer reducer
     ) : BackgroundService
     {
         private static FieldInfo pathsField = typeof(DNFLogicDef)
@@ -30,18 +30,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         private static Type logicDefBuilder = typeof(LogicManager).Assembly.GetType("RandomizerCore.Logic.DNFLogicDefBuilder", true)!;
         private static MethodInfo createDnfLogicDef = logicDefBuilder.GetMethod("CreateDNFLogicDef")!;
-
-        // todo - consume these as input
-        // these only set state unconditionally and therefore are completely redundant when appearing in sequence
-        private static readonly HashSet<string> StateSetters = [
-            "$FLOWERGET",
-            "$BENCHRESET",
-            "$HOTSPRINGRESET",
-            "$SAVEQUITRESET",
-            "$STARTRESPAWN",
-            "$WARPTOBENCH",
-            "$WARPTOSTART"
-        ];
 
         private CommandLineOptions options = optionsService.Value;
 
@@ -158,7 +146,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             logger.LogInformation("Performing substitution along path: {}", path.ToString());
             Dictionary<string, List<StatefulClause>> clauses = new();
             // get all referenced logic as well as we may need to solve for that too
-            Queue<string> processingQueue = new(path.Select(x => x.Name).Distinct());
+            Queue<string> processingQueue = new();
+            processingQueue.Enqueue(path.First().Name);
             while (processingQueue.TryDequeue(out string? next))
             {
                 if (clauses.ContainsKey(next))
@@ -179,22 +168,22 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
             }
 
-            // goal: reduce all logic references one at a time in sequence. This can be accomplished by performing substitutions
-
-            foreach (WaypointReferenceNode node in path)
+            while (clauses.Values.Any(clause => HasAnyReferencesTo(clause, clauses.Keys)))
             {
-                // simplify
-                clauses[node.Name] = RemoveRedundantClauses(clauses[node.Name]);
-                string readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
-                logger.LogInformation("Substitution stage 1 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
-                // substitute all self-referential waypoints, doing self-substitution in accordance to state modifier type
-                clauses[node.Name] = SubstituteSelfReferences(lm, clauses[node.Name], node.Name);
-                readable = string.Join(" | ", clauses[node.Name].Select(clause => clause.ToString()));
-                logger.LogInformation("Substitution stage 2 - DNF'd and simplified to clauses for {}: {}", node.Name, readable);
+                foreach (string reference in clauses.Keys)
+                {
+                    // first substitute any self-references that are already present so that we can safely
+                    // substitute this into other expressions
+                    clauses[reference] = SubstituteSelfReferences(lm, clauses[reference], reference);
+                    foreach (string other in clauses.Keys.Where(x => x != reference))
+                    {
+                        clauses[other] = SubstituteInExpression(lm, clauses[other], reference, clauses[reference]);
+                    }
+                }
             }
         }
 
-        private IEnumerable<string> GetNonSelfReferences(List<StatefulClause> clauses, string name, Dictionary<string, RawWaypointDef> statefulWaypoints)
+        private IEnumerable<string> GetNonSelfReferences(IEnumerable<StatefulClause> clauses, string name, Dictionary<string, RawWaypointDef> statefulWaypoints)
         {
             return clauses.SelectMany(x => x.ToTokens())
                 .OfType<SimpleToken>()
@@ -203,23 +192,38 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 .Distinct();
         }
 
-        private IEnumerable<StatefulClause> SubstituteInExpression(List<StatefulClause> substituteInto, string tokenToSubst, List<StatefulClause> substitution)
+        private bool HasAnyReferencesTo(IEnumerable<StatefulClause> clauses, IReadOnlyCollection<string> references)
         {
+            return clauses.SelectMany(x => x.ToTokens())
+                .OfType<SimpleToken>()
+                .Select(x => x.Name)
+                .Any(references.Contains);
+        }
+
+        private List<StatefulClause> SubstituteInExpression(LogicManager lm, 
+            List<StatefulClause> substituteInto, string tokenToSubst, List<StatefulClause> substitution)
+        {
+            List<StatefulClause> result = [];
             foreach (StatefulClause clause in substituteInto)
             {
                 foreach (StatefulClause newClause in clause.SubstituteReference(tokenToSubst, substitution))
                 {
-                    yield return newClause;
+                    StatefulClause? reduced = reducer.ReduceStateModifiers(lm, newClause);
+                    if (reduced != null)
+                    {
+                        result.Add(reduced);
+                    }
                 }
             }
+            return RemoveRedundantClauses(result);
         }
 
         private List<StatefulClause> SubstituteSelfReferences(LogicManager lm, List<StatefulClause> substituteInto, string tokenToSubst)
         {
             var groupings = substituteInto.GroupBy(x => x.ClassifySelfReferentialityOrThrow(tokenToSubst))
                 .ToDictionary(g => g.Key, g => g.ToList());
-            List<StatefulClause> nonSelfReferenceClauses = groupings[false];
-            foreach (StatefulClause selfReference in groupings[true])
+            List<StatefulClause> nonSelfReferenceClauses = groupings.GetValueOrDefault(false, []);
+            foreach (StatefulClause selfReference in groupings.GetValueOrDefault(true, []))
             {
                 StateModifierKind kind = stateClassifier.ClassifyMany(selfReference.StateModifiers);
 
@@ -230,7 +234,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     List<StatefulClause> newClauses = [];
                     foreach (StatefulClause clause in nonSelfReferenceClauses)
                     {
-                        newClauses.Add(ReduceStateModifiersForClause(lm, selfReference.SubstituteStateProvider(clause)));
+                        StatefulClause newClause = selfReference.SubstituteStateProvider(clause);
+                        StatefulClause? reduced = reducer.ReduceStateModifiers(lm, newClause);
+                        if (reduced != null)
+                        {
+                            newClauses.Add(reduced);
+                        }
                     }
                     nonSelfReferenceClauses.AddRange(newClauses);
                 }
@@ -244,9 +253,15 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     foreach (StatefulClause clause in nonSelfReferenceClauses)
                     {
                         StatefulClause newClause = selfReference.SubstituteStateProvider(clause);
-                        newClauses.Add(ReduceStateModifiersForClause(lm, newClause));
-                        if (!clause.Conditions.IsSupersetOf(selfReference.Conditions))
+                        StatefulClause? reduced = reducer.ReduceStateModifiers(lm, newClause);
+                        if (reduced != null)
                         {
+                            newClauses.Add(reduced);
+                        }
+                        if (reduced == null || !clause.Conditions.IsSupersetOf(selfReference.Conditions))
+                        {
+                            // if the new clause is actually impossible, or if the conditions are not improved,
+                            // we cannot drop the old clause
                             newClauses.Add(clause);
                         }
                     }
@@ -263,26 +278,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return nonSelfReferenceClauses;
         }
 
-        private StatefulClause ReduceStateModifiersForClause(LogicManager lm, StatefulClause clause)
-        {
-            string lastPrefix = "";
-            List<SimpleToken> reducedStateModifiers = [];
-            foreach (SimpleToken token in clause.StateModifiers)
-            {
-                string prefix = prefixParser.GetPrefix(token.Name);
-
-                // skip redundant setters
-                if (prefix == lastPrefix && StateSetters.Contains(prefix))
-                {
-                    continue;
-                }
-
-                reducedStateModifiers.Add(token);
-                lastPrefix = prefix;
-            }
-            return new StatefulClause(lm, clause.StateProvider, clause.Conditions, reducedStateModifiers);
-        }
-
         private List<StatefulClause> RemoveRedundantClauses(List<StatefulClause> clauses)
         {
             List<StatefulClause> result = new(clauses);
@@ -292,20 +287,20 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 for (int j = i + 1; j < result.Count; j++)
                 {
                     StatefulClause cj = result[j];
-                    if (ci.IsSameOrBetterThan(cj, stateClassifier))
-                    {
-                        // the left clause is better than the right clause. drop the right clause.
-                        // continuing the loop will select the correct right clause next.
-                        result.RemoveAt(j);
-                        j--;
-                    }
-                    else if (cj.IsSameOrBetterThan(ci, stateClassifier))
+                    if (cj.IsSameOrBetterThan(ci, stateClassifier))
                     {
                         // the right clause is better than the left clause. drop the left clause.
                         // this will result in needing to select a new left clause so break out.
                         result.RemoveAt(i);
                         i--;
                         break;
+                    }
+                    else if (ci.IsSameOrBetterThan(cj, stateClassifier))
+                    {
+                        // the left clause is better than the right clause. drop the right clause.
+                        // continuing the loop will select the correct right clause next.
+                        result.RemoveAt(j);
+                        j--;
                     }
                 }
             }

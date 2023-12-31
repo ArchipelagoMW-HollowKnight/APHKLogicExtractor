@@ -1,6 +1,8 @@
-﻿namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
+﻿using RandomizerCore.Logic;
+
+namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
-    internal class TermPrefixParser
+    internal class VariableParser
     {
         public string GetPrefix(string term)
         {
@@ -17,6 +19,16 @@
                 return term;
             }
             return term[0..x];
+        }
+
+        public (string prefix, string[] parameters) Parse(string term)
+        {
+            string prefix = GetPrefix(term);
+            if (VariableResolver.TryMatchPrefix(term, prefix, out string[]? parameters))
+            {
+                return (prefix, parameters);
+            }
+            throw new ArgumentException("Not a valid term to parse variable", nameof(term));
         }
     }
 }
