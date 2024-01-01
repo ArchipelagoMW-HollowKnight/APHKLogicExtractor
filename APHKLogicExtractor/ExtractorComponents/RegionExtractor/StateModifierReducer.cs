@@ -22,8 +22,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             List<SimpleToken> modifiers = [.. clause.StateModifiers];
             for (int i = 0; i < modifiers.Count; i++)
             {
-                // if 2 identical setters appear immediately in sequence they are redundant
                 string prefix = parser.GetPrefix(modifiers[i].Name);
+
+                // if 2 identical setters appear immediately in sequence they are redundant
                 while (i + 1 < modifiers.Count && parser.GetPrefix(modifiers[i + 1].Name) == prefix)
                 {
                     modifiers.RemoveAt(i + 1);
@@ -77,6 +78,16 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                         }
                     }
                 }
+            }
+
+
+            // assume that some arbitrarily long sequence of modifiers after other reductions
+            // is incompletable or redundant.
+            // It does not reproduce logic in full fidelity but does allow
+            // the completion of the program so it is a worthwhile tradeoff
+            if (modifiers.Count > 10)
+            {
+                return null;
             }
 
             return new StatefulClause(lm, clause.StateProvider, clause.Conditions, modifiers);

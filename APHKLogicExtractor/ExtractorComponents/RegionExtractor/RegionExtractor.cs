@@ -181,6 +181,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     }
                 }
             }
+
+            string clauseCounts = string.Join("\n", clauses.Select(x => $"* {x.Key}: {x.Value.Count}"));
+            logger.LogInformation("Solved cycle {}, clause counts are:\n{}", path.ToString(), clauseCounts);
         }
 
         private IEnumerable<string> GetNonSelfReferences(IEnumerable<StatefulClause> clauses, string name, Dictionary<string, RawWaypointDef> statefulWaypoints)

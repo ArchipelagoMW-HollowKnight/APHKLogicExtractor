@@ -148,7 +148,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
 
             // ensure that we have better conditions (no more than) the other clause
-            if (!Conditions.IsSubsetOf(other.Conditions))
+            if (!other.Conditions.IsSupersetOf(Conditions))
             {
                 return false;
             }
@@ -169,11 +169,16 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         }
 
         private bool HasSublistWithAdditionalModifiersOfKind(
-            IReadOnlyList<SimpleToken> list, 
-            IReadOnlyList<SimpleToken> sublist, 
+            IReadOnlyList<SimpleToken> list,
+            IReadOnlyList<SimpleToken> sublist,
             StateModifierClassifier classifier,
             StateModifierKind kind)
         {
+            if (!list.ToHashSet().IsSupersetOf(sublist))
+            {
+                return false;
+            }
+
             int i = 0;
             for (; i + sublist.Count <= list.Count; i++)
             {
