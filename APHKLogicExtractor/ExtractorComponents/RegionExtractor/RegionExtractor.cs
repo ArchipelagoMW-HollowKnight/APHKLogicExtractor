@@ -104,6 +104,29 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     logger.LogWarning($"Region {region.Name} has no exits or locations, rendering it useless");
                 }
             }
+            HashSet<Region> regionsExcludedFromMerge = [];
+            while (true)
+            {
+                IEnumerable<Region> candidateRegions = builder.Regions.Values
+                    .Where(x => !regionsExcludedFromMerge.Contains(x))
+                    .Where(x => x.Locations.Any() && !x.Exits.Any() && builder.GetParents(x.Name).Count == 1);
+                if (!candidateRegions.Any())
+                {
+                    break;
+                }
+                foreach (Region r in candidateRegions)
+                {
+                    if (CanAbsorb(builder, r, out Region parent))
+                    {
+                        parent.Locations.UnionWith(r.Locations);
+                        builder.RemoveRegion(r.Name);
+                    }
+                    else
+                    {
+                        regionsExcludedFromMerge.Add(r);
+                    }
+                }
+            }
             builder.Validate();
             List<Region> regions = builder.Build();
 
@@ -125,6 +148,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 CompilationContext ctx = new(writer, new CompilationOptions());
                 await builder.BuildDotGraph().CompileAsync(ctx);
             }
+            logger.LogInformation("Successfully exported {} regions", regions.Count);
         }
 
         private List<StatefulClause> RemoveRedundantClauses(List<StatefulClause> clauses)
@@ -154,6 +178,34 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
             }
             return result;
+        }
+
+        private bool CanAbsorb(RegionGraphBuilder builder, Region r, out Region pparent)
+        {
+            Region parent = pparent = builder.GetParents(r.Name).First();
+            IEnumerable<Region.Connection> conns = parent.Exits.Where(x => x.Target == r);
+            IEnumerable<Region> grandparents = builder.GetParents(parent.Name);
+            if (!grandparents.Any())
+            {
+                return conns.All(x => x.ItemRequirements.Count == 0 && x.LocationRequirements.Count == 0 && x.StateModifiers.Count == 0);
+            }
+            else
+            {
+                static bool ConnectionIsSuperset(Region.Connection c1, Region.Connection c2)
+                {
+                    if (!c1.ItemRequirements.IsSupersetOf(c2.ItemRequirements)
+                        || !c1.LocationRequirements.IsSupersetOf(c2.LocationRequirements))
+                    {
+                        return false;
+                    }
+
+                    // this should compare state modifiers as well, but since we limit to cases where c2 has no state modifiers
+                    // we can skip that. Long run we may want to do something like StatefulClause.HasSublistWithAdditionalModifiersOfKind
+                    return true;
+                }
+                return conns.All(x => x.StateModifiers.Count == 0)
+                    && grandparents.SelectMany(x => x.Exits).All(gpConn => conns.All(conn => ConnectionIsSuperset(gpConn, conn)));
+            }
         }
 
         private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)

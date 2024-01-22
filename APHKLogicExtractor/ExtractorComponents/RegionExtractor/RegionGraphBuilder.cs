@@ -10,8 +10,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
     internal class RegionGraphBuilder
     {
         private Dictionary<string, Region> regions = new();
-        private Dictionary<string, List<Region>> parentLookup = new();
-        public IReadOnlyDictionary<string, Region> Regions => regions.ToImmutableDictionary();
+        private Dictionary<string, HashSet<Region>> parentLookup = new();
+        public IReadOnlyDictionary<string, Region> Regions => regions;
 
         public RegionGraphBuilder() 
         {
@@ -73,9 +73,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 var (itemReqs, locationReqs) = PartitionRequirements(clause.Conditions);
                 parent.Connect(itemReqs, locationReqs, clause.StateModifiers.Select(c => c.Write()), r);
                 
-                if (!parentLookup.TryGetValue(logicObject.Name, out List<Region>? parents))
+                if (!parentLookup.TryGetValue(logicObject.Name, out HashSet<Region>? parents))
                 {
-                    parents = new List<Region>();
+                    parents = new HashSet<Region>();
                     parentLookup[logicObject.Name] = parents;
                 }
                 parents.Add(parent);
@@ -93,7 +93,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             parentLookup.Remove(name);
         }
 
-        public IReadOnlyList<Region> GetParents(string regionName) => parentLookup[regionName];
+        public IReadOnlySet<Region> GetParents(string regionName) => parentLookup.GetValueOrDefault(regionName, []);
 
         public void Validate()
         {
