@@ -2,7 +2,7 @@
   "profiles": {
     "APHKLogicExtractor": {
       "commandName": "Project",
-      "commandLineArgs": "--RefName master --Scenes Town --Scenes Mines_10 --WarpWaypoints Can_Stag --WarpWaypoints \"Warp-.*\" --WarpWaypoints Left_Elevator --WarpWaypoints Right_Elevator --WarpWaypoints Upper_Tram --WarpWaypoints Lower_Tram --IgnoredWaypoints Start_State --IgnoredWaypoints Can_Bench"
+      "commandLineArgs": "--RefName master --Scenes Town --Scenes Mines_10"
     }
   }
 }

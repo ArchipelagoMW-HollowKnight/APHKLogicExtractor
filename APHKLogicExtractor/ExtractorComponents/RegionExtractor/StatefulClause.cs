@@ -8,11 +8,11 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
     {
         private readonly LogicManager lm;
 
-        public TermToken StateProvider { get; }
+        public TermToken? StateProvider { get; }
         public IReadOnlySet<TermToken> Conditions { get; }
-        public IReadOnlyList<SimpleToken> StateModifiers { get; }
+        public IReadOnlyList<TermToken> StateModifiers { get; }
 
-        public StatefulClause(LogicManager lm, TermToken stateProvider, IReadOnlySet<TermToken> conditions, IReadOnlyList<SimpleToken> stateModifiers)
+        public StatefulClause(LogicManager lm, TermToken? stateProvider, IReadOnlySet<TermToken> conditions, IReadOnlyList<TermToken> stateModifiers)
         {
             this.lm = lm;
             this.StateProvider = stateProvider;
@@ -28,7 +28,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         {
             this.lm = lm;
             HashSet<TermToken> conditions = [];
-            List<SimpleToken> stateModifiers = [];
+            List<TermToken> stateModifiers = [];
 
             foreach (TermToken token in clause)
             {
@@ -47,7 +47,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     }
                     else if (lm.GetVariable(st.Name) is LogicVariable v)
                     {
-                        if (v is StateProvider && StateProvider == null)
+                        if (v is IStateProvider && StateProvider == null)
                         {
                             StateProvider = token;
                         }
@@ -65,6 +65,28 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                         throw new ArgumentException($"A token of an unknown type was provided: {token}", nameof(clause));
                     }
                 }
+                else if (token is ReferenceToken)
+                {
+                    if (StateProvider == null)
+                    {
+                        StateProvider = token;
+                    }
+                    else
+                    {
+                        conditions.Add(token);
+                    }
+                }
+                else if (token is ComparisonToken ct)
+                {
+                    if (lm.GetVariable(ct.Left) is StateAccessVariable || lm.GetVariable(ct.Right) is StateAccessVariable)
+                    {
+                        stateModifiers.Add(ct);
+                    }
+                    else
+                    {
+                        conditions.Add(ct);
+                    }
+                }
                 else
                 {
                     conditions.Add(token);
@@ -73,7 +95,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
             Conditions = conditions;
             StateModifiers = stateModifiers;
-            if (StateProvider == null)
+            if (StateProvider == null && StateModifiers.Count > 0)
             {
                 throw new ArgumentException($"No state-providing token was provided", nameof(clause));
             }
@@ -127,11 +149,16 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         /// </summary>
         public StatefulClause SubstituteStateProvider(StatefulClause other)
         {
-            TermToken sp = other.StateProvider;
+            if (StateProvider == null)
+            {
+                throw new InvalidOperationException("Can't substitute state provider in a clause without a state provider");
+            }
+
+            TermToken? sp = other.StateProvider;
             HashSet<TermToken> conditions = [.. other.Conditions, .. Conditions];
             // order matters here - since we are substituting into the state provider, which is on the left,
             // the substitution's state modifiers must go to the left of our state modifiers
-            List<SimpleToken> stateModifiers = [.. other.StateModifiers, .. StateModifiers];
+            List<TermToken> stateModifiers = [.. other.StateModifiers, .. StateModifiers];
             return new StatefulClause(lm, sp, conditions, stateModifiers);
         }
 
@@ -169,8 +196,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         }
 
         private bool HasSublistWithAdditionalModifiersOfKind(
-            IReadOnlyList<SimpleToken> list,
-            IReadOnlyList<SimpleToken> sublist,
+            IReadOnlyList<TermToken> list,
+            IReadOnlyList<TermToken> sublist,
             StateModifierClassifier classifier,
             StateModifierKind kind)
         {
@@ -215,6 +242,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         public List<TermToken> ToTokens()
         {
+            if (StateProvider == null)
+            {
+                return [
+                    .. Conditions,
+                    .. StateModifiers
+                ];
+            }
+
             return [
                 StateProvider,
                 .. Conditions,
