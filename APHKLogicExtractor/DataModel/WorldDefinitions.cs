@@ -11,9 +11,15 @@ namespace APHKLogicExtractor.DataModel
         Transition
     }
 
-    internal record LogicObjectDefinition(string Name, IEnumerable<StatefulClause> Logic, LogicHandling Handling = LogicHandling.Default);
+    internal record LogicObjectDefinition(
+        string Name,
+        IEnumerable<StatefulClause> Logic,
+        LogicHandling Handling = LogicHandling.Default);
 
     internal record StringWorldDefinition(IEnumerable<LogicObjectDefinition> LogicObjects);
 
-    internal record GraphWorldDefinition(IEnumerable<Region> Regions, IEnumerable<GraphLocation> Locations);
+    internal record GraphWorldDefinition(
+        IEnumerable<Region> Regions,
+        IEnumerable<GraphLocation> Locations,
+        IEnumerable<RandomizableTransition> Transitions);
 }

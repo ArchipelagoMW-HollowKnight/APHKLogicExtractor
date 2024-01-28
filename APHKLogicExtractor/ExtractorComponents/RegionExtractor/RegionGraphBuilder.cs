@@ -11,7 +11,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
     {
         private Dictionary<string, Region> regions = new();
         private Dictionary<string, GraphLocation> locations = new();
-        private HashSet<string> transitions = new();
+        private Dictionary<string, RandomizableTransition> transitions = new();
+        private Dictionary<string, HashSet<RandomizableTransition>> transitionsByParentRegion = new();
         private Dictionary<string, HashSet<Region>> parentLookup = new();
         public IReadOnlyDictionary<string, Region> Regions => regions;
 
@@ -28,17 +29,29 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 r.Locations.Add(logicObject.Name);
                 AddLocation(logicObject.Name);
             }
+            RandomizableTransition? t = null;
             if (logicObject.Handling == LogicHandling.Transition)
             {
-                transitions.Add(logicObject.Name);
+                t = AddTransition(logicObject.Name);
             }
             foreach (StatefulClause clause in logicObject.Logic)
             {
                 string parentName = GetRegionName(clause.StateProvider);
                 Region parent = regions.GetValueOrDefault(parentName) ?? AddRegion(parentName);
                 var (itemReqs, locationReqs) = PartitionRequirements(clause.Conditions);
-                parent.Connect(itemReqs, locationReqs, clause.StateModifiers.Select(c => c.Write()), r);
 
+                if (logicObject.Handling == LogicHandling.Transition && parent == r)
+                {
+                    // if this is a self-loop onto a transition region, this isn't a "real" edge,
+                    // put the logic on the transition object instead;
+                    t.Logic.Add(new RequirementBranch(
+                        itemReqs,
+                        locationReqs,
+                        clause.StateModifiers.Select(c => c.Write()).ToList()));
+                    continue;
+                }
+
+                parent.Connect(itemReqs, locationReqs, clause.StateModifiers.Select(c => c.Write()), r);
                 if (!parentLookup.TryGetValue(logicObject.Name, out HashSet<Region>? parents))
                 {
                     parents = new HashSet<Region>();
@@ -52,7 +65,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         {
             Validate();
             Clean(classfier);
-            return new GraphWorldDefinition(regions.Values, locations.Values);
+            return new GraphWorldDefinition(regions.Values, locations.Values, transitions.Values);
         }
 
         public DotGraph BuildDotGraph()
@@ -95,6 +108,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             GraphLocation l = new(locationName, [new RequirementBranch([], [], [])]);
             locations.Add(locationName, l);
             return l;
+        }
+
+        private RandomizableTransition AddTransition(string transitionName)
+        {
+            RandomizableTransition t = new(transitionName, transitionName, []);
+            transitions.Add(transitionName, t);
+            transitionsByParentRegion.Add(transitionName, [t]);
+            return t;
         }
 
         private string GetRegionName(TermToken? token) => token switch
@@ -227,7 +248,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         {
             IEnumerable<IGraphLogicObject> logicToReduce = regions.Values
                 .SelectMany<Region, IGraphLogicObject>(r => r.Exits)
-                .Concat(locations.Values);
+                .Concat(locations.Values)
+                .Concat(transitions.Values);
             foreach (IGraphLogicObject o in logicToReduce)
             {
                 for (int i = 0; i < o.Logic.Count - 1; i++)
@@ -260,8 +282,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private bool TryMergeIntoParent(Region child)
         {
             // if the region has no exits it is not safe to merge destructively in this manner
-            // if it a transition it needs to be preserved for ER.
-            if (child.Exits.Count != 0 || transitions.Contains(child.Name))
+            if (child.Exits.Count != 0)
             {
                 return false;
             }
@@ -293,8 +314,36 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                         newBranches.Add(cl + ll);
                     }
                 }
-                l.Logic.Clear();
-                l.Logic.AddRange(newBranches);
+                if (conn.Logic.Count > 0)
+                {
+                    l.Logic.Clear();
+                    l.Logic.AddRange(newBranches);
+                }
+            }
+            // if this region is a randomizable transition, pull it up a level and prepend edge logic
+            if (transitionsByParentRegion.TryGetValue(child.Name, out HashSet<RandomizableTransition>? ts))
+            {
+                foreach (RandomizableTransition t in ts)
+                {
+                    t.ParentRegion = parent.Name;
+                    List<RequirementBranch> newBranches = [];
+                    foreach (RequirementBranch cl in conn.Logic)
+                    {
+                        foreach (RequirementBranch tl in t.Logic)
+                        {
+                            newBranches.Add(cl + tl);
+                        }
+                    }
+                    if (conn.Logic.Count == 0)
+                    {
+                        t.Logic.Clear();
+                        t.Logic.AddRange(newBranches);
+                    }
+                }
+                transitionsByParentRegion.Remove(child.Name);
+                HashSet<RandomizableTransition> addTo = transitionsByParentRegion.GetValueOrDefault(child.Name, []);
+                addTo.UnionWith(ts);
+                transitionsByParentRegion[child.Name] = addTo;
             }
             return true;
         }
