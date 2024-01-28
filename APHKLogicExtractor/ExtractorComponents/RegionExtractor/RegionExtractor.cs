@@ -9,11 +9,9 @@ using Newtonsoft.Json;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringLogic;
-using System.Reflection;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
-
     internal class RegionExtractor(
         ILogger<RegionExtractor> logger,
         IOptions<CommandLineOptions> optionsService,
@@ -23,15 +21,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         OutputManager outputManager
     ) : BackgroundService
     {
-        private static FieldInfo pathsField = typeof(DNFLogicDef)
-            .GetField("paths", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        private static Type statePathType = pathsField.FieldType.GetElementType()!;
-        private static MethodInfo toTermTokenSequence = statePathType
-            .GetMethod("ToTermTokenSequence")!;
-
-        private static Type logicDefBuilder = typeof(LogicManager).Assembly.GetType("RandomizerCore.Logic.DNFLogicDefBuilder", true)!;
-        private static MethodInfo createDnfLogicDef = logicDefBuilder.GetMethod("CreateDNFLogicDef")!;
-
         private CommandLineOptions options = optionsService.Value;
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -81,22 +70,22 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             {
                 List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, transition.name);
                 LogicObjectDefinition def = new(transition.name, clauses);
-                builder.AddOrUpdateLogicObject(def, false);
+                builder.AddOrUpdateLogicObject(def, false, true);
             }
             foreach (RawWaypointDef waypoint in waypointLogic)
             {
                 List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, waypoint.name);
                 LogicObjectDefinition def = new(waypoint.name, clauses);
-                builder.AddOrUpdateLogicObject(def, waypoint.stateless);
+                builder.AddOrUpdateLogicObject(def, waypoint.stateless, false);
             }
             foreach (RawLogicDef location in locationLogic)
             {
                 List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, location.name);
                 LogicObjectDefinition def = new(location.name, clauses);
-                builder.AddOrUpdateLogicObject(def, true);
+                builder.AddOrUpdateLogicObject(def, true, false);
             }
 
-            logger.LogInformation("Simplifying region graph");
+            logger.LogInformation("Beginning final output");
             foreach (Region region in builder.Regions.Values)
             {
                 if (region.Locations.Count == 0 && region.Exits.Count == 0)
@@ -104,39 +93,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     logger.LogWarning($"Region {region.Name} has no exits or locations, rendering it useless");
                 }
             }
-            HashSet<Region> regionsExcludedFromMerge = [];
-            while (true)
-            {
-                IEnumerable<Region> candidateRegions = builder.Regions.Values
-                    .Where(x => !regionsExcludedFromMerge.Contains(x))
-                    .Where(x => x.Locations.Any() && !x.Exits.Any() && builder.GetParents(x.Name).Count == 1);
-                if (!candidateRegions.Any())
-                {
-                    break;
-                }
-                foreach (Region r in candidateRegions)
-                {
-                    if (CanAbsorb(builder, r, out Region parent))
-                    {
-                        parent.Locations.UnionWith(r.Locations);
-                        builder.RemoveRegion(r.Name);
-                    }
-                    else
-                    {
-                        regionsExcludedFromMerge.Add(r);
-                    }
-                }
-            }
             builder.Validate();
-            List<Region> regions = builder.Build();
-
-            logger.LogInformation("Beginning final output");
-            GraphWorldDefinition world = new(regions);
+            GraphWorldDefinition world = builder.Build();
             using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))
             {
                 using (JsonTextWriter jtw = new(writer))
                 {
-                    JsonSerializer ser = new JsonSerializer()
+                    JsonSerializer ser = new()
                     {
                         Formatting = Formatting.Indented,
                     };
@@ -148,7 +111,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 CompilationContext ctx = new(writer, new CompilationOptions());
                 await builder.BuildDotGraph().CompileAsync(ctx);
             }
-            logger.LogInformation("Successfully exported {} regions", regions.Count);
+            logger.LogInformation("Successfully exported {} regions ({} empty) and {} locations", 
+                world.Regions.Count(), 
+                world.Regions.Where(r => r.Locations.Count == 0).Count(),
+                world.Locations.Count());
         }
 
         private List<StatefulClause> RemoveRedundantClauses(List<StatefulClause> clauses)
@@ -180,34 +146,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return result;
         }
 
-        private bool CanAbsorb(RegionGraphBuilder builder, Region r, out Region pparent)
-        {
-            Region parent = pparent = builder.GetParents(r.Name).First();
-            IEnumerable<Region.Connection> conns = parent.Exits.Where(x => x.Target == r);
-            IEnumerable<Region> grandparents = builder.GetParents(parent.Name);
-            if (!grandparents.Any())
-            {
-                return conns.All(x => x.ItemRequirements.Count == 0 && x.LocationRequirements.Count == 0 && x.StateModifiers.Count == 0);
-            }
-            else
-            {
-                static bool ConnectionIsSuperset(Region.Connection c1, Region.Connection c2)
-                {
-                    if (!c1.ItemRequirements.IsSupersetOf(c2.ItemRequirements)
-                        || !c1.LocationRequirements.IsSupersetOf(c2.LocationRequirements))
-                    {
-                        return false;
-                    }
-
-                    // this should compare state modifiers as well, but since we limit to cases where c2 has no state modifiers
-                    // we can skip that. Long run we may want to do something like StatefulClause.HasSublistWithAdditionalModifiersOfKind
-                    return true;
-                }
-                return conns.All(x => x.StateModifiers.Count == 0)
-                    && grandparents.SelectMany(x => x.Exits).All(gpConn => conns.All(conn => ConnectionIsSuperset(gpConn, conn)));
-            }
-        }
-
         private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)
         {
             LogicDef def = lm.GetLogicDefStrict(name);
@@ -221,15 +159,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         private List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd)
         {
-            Array statePaths = (Array)pathsField.GetValue(dd)!;
-            List<StatefulClause> clausesForDef = [];
-            foreach (object statePath in statePaths)
-            {
-                IEnumerable<IEnumerable<TermToken>> clausesForPath
-                    = (IEnumerable<IEnumerable<TermToken>>)toTermTokenSequence.Invoke(statePath, [])!;
-                clausesForDef.AddRange(clausesForPath.Select(x => new StatefulClause(lm, x.ToList())).ToList());
-            }
-            return clausesForDef;
+            // remove FALSE clauses, and remove TRUE from all clauses
+            IEnumerable<IEnumerable<TermToken>> clauses = dd.ToTermTokenSequences()
+                .Where(x => !x.Contains(ConstToken.False));
+            return clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True))).ToList();
         }
     }
 }

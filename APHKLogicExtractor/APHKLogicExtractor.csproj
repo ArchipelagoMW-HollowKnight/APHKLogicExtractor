@@ -16,12 +16,8 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="RandomizerCore">
-      <HintPath>..\..\RandomizerCore\RandomizerCore\bin\Debug\net8.0\RandomizerCore.dll</HintPath>
-    </Reference>
+    <PackageReference Include="RandomizerCore" Version="2.0.0" />
+    <PackageReference Include="RandomizerCore.Json" Version="1.0.0" />
   </ItemGroup>
 
 </Project>

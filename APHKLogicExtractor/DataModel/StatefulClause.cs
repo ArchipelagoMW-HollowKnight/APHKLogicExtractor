@@ -1,8 +1,9 @@
-﻿using RandomizerCore.Logic;
+﻿using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
+using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringLogic;
 
-namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
+namespace APHKLogicExtractor.DataModel
 {
     internal class StatefulClause
     {
@@ -15,9 +16,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         public StatefulClause(LogicManager lm, TermToken? stateProvider, IReadOnlySet<TermToken> conditions, IReadOnlyList<TermToken> stateModifiers)
         {
             this.lm = lm;
-            this.StateProvider = stateProvider;
-            this.Conditions = conditions;
-            this.StateModifiers = stateModifiers;
+            StateProvider = stateProvider;
+            Conditions = conditions;
+            StateModifiers = stateModifiers;
         }
 
         /// <summary>
