@@ -5,7 +5,7 @@ namespace APHKLogicExtractor.DataModel
     [JsonConverter(typeof(ConnectionSerializer))]
     internal record Connection(
         List<RequirementBranch> Logic,
-        Region Target);
+        Region Target): IGraphLogicObject;
 
     internal class ConnectionSerializer : JsonConverter<Connection>
     {

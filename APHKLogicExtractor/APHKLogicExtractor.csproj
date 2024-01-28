@@ -20,4 +20,10 @@
     <PackageReference Include="RandomizerCore.Json" Version="1.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="hkStateConfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -143,7 +143,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     logger.LogWarning($"Region {region.Name} has no exits or locations, rendering it useless");
                 }
             }
-            GraphWorldDefinition world = builder.Build();
+            GraphWorldDefinition world = builder.Build(stateClassifier);
             using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))
             {
                 using (JsonTextWriter jtw = new(writer))
@@ -164,35 +164,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 world.Regions.Count(), 
                 world.Regions.Where(r => r.Locations.Count == 0).Count(),
                 world.Locations.Count());
-        }
-
-        private List<StatefulClause> RemoveRedundantClauses(List<StatefulClause> clauses)
-        {
-            List<StatefulClause> result = new(clauses);
-            for (int i = 0; i < result.Count - 1; i++)
-            {
-                StatefulClause ci = result[i];
-                for (int j = i + 1; j < result.Count; j++)
-                {
-                    StatefulClause cj = result[j];
-                    if (cj.IsSameOrBetterThan(ci, stateClassifier))
-                    {
-                        // the right clause is better than the left clause. drop the left clause.
-                        // this will result in needing to select a new left clause so break out.
-                        result.RemoveAt(i);
-                        i--;
-                        break;
-                    }
-                    else if (ci.IsSameOrBetterThan(cj, stateClassifier))
-                    {
-                        // the left clause is better than the right clause. drop the right clause.
-                        // continuing the loop will select the correct right clause next.
-                        result.RemoveAt(j);
-                        j--;
-                    }
-                }
-            }
-            return result;
         }
 
         private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)

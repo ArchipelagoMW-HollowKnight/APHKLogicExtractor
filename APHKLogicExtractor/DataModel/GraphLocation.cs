@@ -1,4 +1,4 @@
 ﻿namespace APHKLogicExtractor.DataModel
 {
-    internal record GraphLocation(string Name, List<RequirementBranch> Logic);
+    internal record GraphLocation(string Name, List<RequirementBranch> Logic) : IGraphLogicObject;
 }

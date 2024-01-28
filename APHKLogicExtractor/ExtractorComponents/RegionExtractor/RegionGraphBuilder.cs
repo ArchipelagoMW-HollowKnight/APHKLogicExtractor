@@ -48,10 +48,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
         }
 
-        public GraphWorldDefinition Build()
+        public GraphWorldDefinition Build(StateModifierClassifier classfier)
         {
             Validate();
-            Clean();
+            Clean(classfier);
             return new GraphWorldDefinition(regions.Values, locations.Values);
         }
 
@@ -160,9 +160,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
         }
 
-        private void Clean()
+        private void Clean(StateModifierClassifier classifier)
         {
-            while (regions.Values.Any(TryMergeIntoParent)) { }
+            RemoveRedundantLogicBranches(classifier);
+            while (regions.Values.Any(TryMergeIntoParent)) 
+            {
+                RemoveRedundantLogicBranches(classifier);
+            }
             foreach (Region region in regions.Values)
             {
                 foreach (Connection connection in region.Exits)
@@ -185,6 +189,72 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 region.Disconnect(r);
             }
             parentLookup.Remove(name);
+        }
+
+        private bool IsBranchDefinitelyImproved(
+            RequirementBranch first,
+            RequirementBranch second,
+            StateModifierClassifier classifier)
+        {
+            bool reqsAreSubset = first.ItemRequirements.IsSubsetOf(second.ItemRequirements)
+                && first.LocationRequirements.IsSubsetOf(second.LocationRequirements);
+            if (!reqsAreSubset)
+            {
+                return false;
+            }
+
+            if (first.StateModifiers.Count >=  second.StateModifiers.Count)
+            {
+                // if we have more modifiers, anything extra must be definitely positive
+                return Utils.HasSublistWithAdditionalModifiersOfKind(
+                    first.StateModifiers,
+                    second.StateModifiers,
+                    classifier,
+                    StateModifierKind.Beneficial);
+            }
+            else
+            {
+                // if they have more, then all the extra must be definitely negative
+                return Utils.HasSublistWithAdditionalModifiersOfKind(
+                    second.StateModifiers,
+                    first.StateModifiers,
+                    classifier,
+                    StateModifierKind.Detrimental);
+            }
+        }
+
+        private void RemoveRedundantLogicBranches(StateModifierClassifier classifier)
+        {
+            IEnumerable<IGraphLogicObject> logicToReduce = regions.Values
+                .SelectMany<Region, IGraphLogicObject>(r => r.Exits)
+                .Concat(locations.Values);
+            foreach (IGraphLogicObject o in logicToReduce)
+            {
+                for (int i = 0; i < o.Logic.Count - 1; i++)
+                {
+                    RequirementBranch li = o.Logic[i];
+                    for (int j = i + 1; j < o.Logic.Count; j++)
+                    {
+                        RequirementBranch lj = o.Logic[j];
+
+                        if (IsBranchDefinitelyImproved(lj, li, classifier))
+                        {
+                            // the right clause is better than the left clause. drop the left clause.
+                            // this will result in needing to select a new left clause so break out.
+                            o.Logic.RemoveAt(i);
+                            i--;
+                            break;
+                        }
+                        else if (IsBranchDefinitelyImproved(li, lj, classifier))
+                        {
+                            // the left clause is better than the right clause. drop the right clause.
+                            // continuing the loop will select the correct right clause next.
+                            o.Logic.RemoveAt(j);
+                            j--;
+                        }
+                    }
+                }
+            }
         }
 
         private bool TryMergeIntoParent(Region child)

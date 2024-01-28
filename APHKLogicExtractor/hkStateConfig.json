@@ -1,0 +1,63 @@
+{
+  "BeneficialModifiers": [
+    "$BENCHRESET", // derived from named state, could be mixed but default beneficially resets most fields
+    "$FLOWERGET",
+    "$HOTSPRINGRESET", // derived from named state, could be mixed but default fills soul
+    "$REGAINSOUL",
+    "$STARTRESPAWN" // derived from named state, could be mixed but default recovers soul and HP from start location
+  ],
+  "DetrimentalModifiers": [
+    "$SHADESKIP",
+    "$SPENDSOUL",
+    "$TAKEDAMAGE",
+    "$EQUIPCHARM",
+    "$STAGSTATEMODIFIER",
+    "$SAVEQUITRESET" // derived from named state, could be mixed but default just removes soul on save/quit or warp
+  ],
+  "OtherModifiers": [
+    "$CASTSPELL",
+    "$SHRIEKPOGO",
+    "$SLOPEBALL",
+    "$WARPTOBENCH", // derived from named state (savequitreset + benchreset)
+    "$WARPTOSTART" // derived from named state (savequitreset + startrespawn)
+  ],
+  "ArgumentClassifiers": [
+    // spell casts are always bad if you can't get soul before/after them
+    {
+      "Prefix": "$CASTSPELL",
+      "Comparison": "NoArgStartsWith",
+      "Test": "before:",
+      "ClassificationWhenMatched": "Detrimental"
+    },
+    {
+      "Prefix": "$CASTSPELL",
+      "Comparison": "NoArgStartsWith",
+      "Test": "after:",
+      "ClassificationWhenMatched": "Detrimental"
+    },
+    {
+      "Prefix": "$SHRIEKPOGO",
+      "Comparison": "NoArgStartsWith",
+      "Test": "before:",
+      "ClassificationWhenMatched": "Detrimental"
+    },
+    {
+      "Prefix": "$SHRIEKPOGO",
+      "Comparison": "NoArgStartsWith",
+      "Test": "after:",
+      "ClassificationWhenMatched": "Detrimental"
+    },
+    {
+      "Prefix": "$SLOPEBALL",
+      "Comparison": "NoArgStartsWith",
+      "Test": "before:",
+      "ClassificationWhenMatched": "Detrimental"
+    },
+    {
+      "Prefix": "$SLOPEBALL",
+      "Comparison": "NoArgStartsWith",
+      "Test": "after:",
+      "ClassificationWhenMatched": "Detrimental"
+    }
+  ]
+}

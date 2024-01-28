@@ -1,40 +1,38 @@
-﻿using RandomizerCore.StringLogic;
+﻿using APHKLogicExtractor.DataModel;
+using Microsoft.Extensions.Options;
+using RandomizerCore.Json;
+using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
-    internal enum StateModifierKind
+    internal class StateModifierClassifier
     {
-        None,
-        Beneficial,
-        Detrimental,
-        Mixed
-    }
+        private VariableParser prefixParser;
+        private StateClassificationModel classificationModel;
 
-    internal class StateModifierClassifier(VariableParser prefixParser)
-    {
-        // todo - consume these from input
-        private static readonly HashSet<string> BeneficialStateModifiers = [
-            "$BENCHRESET", // derived from named state, could be mixed but default beneficially resets most fields
-            "$FLOWERGET",
-            "$HOTSPRINGRESET", // derived from named state, could be mixed but default fills soul
-            "$REGAINSOUL",
-            "$STARTRESPAWN", // derived from named state, could be mixed but default recovers soul and HP from start location
-        ];
-        private static readonly HashSet<string> DetrimentalStateModifiers = [
-            "$SHADESKIP",
-            "$SPENDSOUL",
-            "$TAKEDAMAGE",
-            "$EQUIPCHARM",
-            "$STAGSTATEMODIFIER",
-            "$SAVEQUITRESET", // derived from named state, could be mixed but default just removes soul on save/quit or warp
-        ];
-        private static readonly HashSet<string> OtherStateModifiers = [
-            "$CASTSPELL",
-            "$SHRIEKPOGO",
-            "$SLOPEBALL",
-            "$WARPTOBENCH", // derived from named state (savequitreset + benchreset)
-            "$WARPTOSTART", // derived from named state (savequitreset + startrespawn)
-        ];
+        public StateModifierClassifier(IOptions<CommandLineOptions> optionsService, VariableParser prefixParser)
+        {
+            this.prefixParser = prefixParser;
+            if (optionsService.Value.ClassifierModelPath != null)
+            {
+                classificationModel = JsonUtil.DeserializeFromFile<StateClassificationModel>(optionsService.Value.ClassifierModelPath)
+                    ?? throw new NullReferenceException("Got null when deserializing state classification model");
+            }
+            else
+            {
+                classificationModel = new([], []);
+            }
+        }
+
+        public StateModifierKind ClassifySingle(string token)
+        {
+            return ClassifySingle(Utils.ParseSingleToken(token));
+        }
+
+        public StateModifierKind ClassifyMany(IEnumerable<string> tokens)
+        {
+            return ClassifyMany(tokens.Select(Utils.ParseSingleToken));
+        }
 
         public StateModifierKind ClassifySingle(TermToken token)
         {
@@ -45,34 +43,27 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             if (token is not SimpleToken st)
             {
-                return StateModifierKind.None;
+                return StateModifierKind.Mixed;
             }
 
             (string prefix, string[] args) = prefixParser.Parse(st.Name);
-            if (prefix == "$CASTSPELL" || prefix == "$SLOPEBALL" || prefix == "$SHRIEKPOGO")
+            foreach (ArgumentClassifier argumentClassifier in classificationModel.ArgumentClassifiers ?? [])
             {
-                // without any soul gain, we can actually classify these as definitely detrimental
-                if (args.Any(x => x.StartsWith("before:") || x.StartsWith("after:")))
+                if (argumentClassifier.Matches(prefix, args))
                 {
-                    return StateModifierKind.Detrimental;
+                    return argumentClassifier.ClassificationWhenMatched;
                 }
-                return StateModifierKind.Mixed;
             }
 
-            if (BeneficialStateModifiers.Contains(prefix))
+            if (classificationModel.BeneficialModifiers.Contains(prefix))
             {
                 return StateModifierKind.Beneficial;
             }
-            if (DetrimentalStateModifiers.Contains(prefix))
+            if (classificationModel.DetrimentalModifiers.Contains(prefix))
             {
                 return StateModifierKind.Detrimental;
             }
-            if (OtherStateModifiers.Contains(prefix))
-            {
-                return StateModifierKind.Mixed;
-            }
-
-            return StateModifierKind.None;
+            return StateModifierKind.Mixed;
         }
 
         public StateModifierKind ClassifyMany(IEnumerable<TermToken> tokens)

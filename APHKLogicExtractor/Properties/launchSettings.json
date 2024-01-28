@@ -1,7 +1,8 @@
 {
   "profiles": {
     "APHKLogicExtractor": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "--ClassifierModelPath \"./hkStateConfig.json\""
     }
   }
 }
