@@ -1,8 +1,7 @@
 {
   "profiles": {
     "APHKLogicExtractor": {
-      "commandName": "Project",
-      "commandLineArgs": "--RefName master --Scenes Town --Scenes Mines_10"
+      "commandName": "Project"
     }
   }
 }

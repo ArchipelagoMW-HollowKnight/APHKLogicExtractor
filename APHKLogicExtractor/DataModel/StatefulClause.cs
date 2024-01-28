@@ -1,4 +1,5 @@
 ﻿using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
+using Newtonsoft.Json;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringLogic;
@@ -7,18 +8,47 @@ namespace APHKLogicExtractor.DataModel
 {
     internal class StatefulClause
     {
-        private readonly LogicManager lm;
-
         public TermToken? StateProvider { get; }
         public IReadOnlySet<TermToken> Conditions { get; }
         public IReadOnlyList<TermToken> StateModifiers { get; }
 
-        public StatefulClause(LogicManager lm, TermToken? stateProvider, IReadOnlySet<TermToken> conditions, IReadOnlyList<TermToken> stateModifiers)
+        private TermToken ParseSingleToken(string token)
         {
-            this.lm = lm;
+            List<LogicToken> tokens = Infix.Tokenize(token);
+            if (tokens.Count != 1 || tokens[0] is not TermToken tt)
+            {
+                throw new ArgumentException($"Logic string {token} must consist of a single TermToken.", nameof(token));
+            }
+            return tt;
+        }
+
+        [JsonConstructor]
+        private StatefulClause(
+            [JsonProperty(PropertyName = "StateProvider")] string? stateProvider,
+            [JsonProperty(PropertyName = "Conditions")] IEnumerable<string> conditions,
+            [JsonProperty(PropertyName = "StateModifiers")] IEnumerable<string> stateModifiers)
+        {
+            if (stateProvider != null)
+            {
+                StateProvider = ParseSingleToken(stateProvider);
+            }
+            Conditions = conditions.Select(ParseSingleToken).ToHashSet();
+            StateModifiers = stateModifiers.Select(ParseSingleToken).ToList();
+            if (StateProvider == null && StateModifiers.Count > 0)
+            {
+                throw new ArgumentException($"No state-providing token was provided", nameof(stateProvider));
+            }
+        }
+
+        public StatefulClause(TermToken? stateProvider, IReadOnlySet<TermToken> conditions, IReadOnlyList<TermToken> stateModifiers)
+        {
             StateProvider = stateProvider;
             Conditions = conditions;
             StateModifiers = stateModifiers;
+            if (StateProvider == null && StateModifiers.Count > 0)
+            {
+                throw new ArgumentException($"No state-providing token was provided", nameof(stateProvider));
+            }
         }
 
         /// <summary>
@@ -27,7 +57,6 @@ namespace APHKLogicExtractor.DataModel
         /// </summary>
         public StatefulClause(LogicManager lm, IEnumerable<TermToken> clause)
         {
-            this.lm = lm;
             HashSet<TermToken> conditions = [];
             List<TermToken> stateModifiers = [];
 
@@ -102,27 +131,6 @@ namespace APHKLogicExtractor.DataModel
             }
         }
 
-        public IEnumerable<StatefulClause> SubstituteReference(string tokenToSubst, List<StatefulClause> substitution)
-        {
-            List<TermToken> clause = ToTokens();
-            int i = clause.FindIndex(x => x is SimpleToken st && st.Name == tokenToSubst);
-            if (i == -1)
-            {
-                // no substitution needed, keep the clause intact
-                yield return new StatefulClause(lm, clause);
-            }
-            else
-            {
-                foreach (StatefulClause subst in substitution)
-                {
-                    List<TermToken> newClause = new(clause);
-                    newClause.RemoveAt(i);
-                    newClause.InsertRange(i, subst.ToTokens());
-                    yield return new StatefulClause(lm, newClause);
-                }
-            }
-        }
-
         /// <summary>
         /// Validates that the clause is either not self-referential (contains no references to name), or that
         /// it is self-referential and that the only reference is the state provider. If neither are met, an exception
@@ -143,24 +151,6 @@ namespace APHKLogicExtractor.DataModel
                 }
             }
             return StateProvider is SimpleToken sp && sp.Name == name;
-        }
-
-        /// <summary>
-        /// Creates a new clause representing the substitution of another clause into this clause's state provider.
-        /// </summary>
-        public StatefulClause SubstituteStateProvider(StatefulClause other)
-        {
-            if (StateProvider == null)
-            {
-                throw new InvalidOperationException("Can't substitute state provider in a clause without a state provider");
-            }
-
-            TermToken? sp = other.StateProvider;
-            HashSet<TermToken> conditions = [.. other.Conditions, .. Conditions];
-            // order matters here - since we are substituting into the state provider, which is on the left,
-            // the substitution's state modifiers must go to the left of our state modifiers
-            List<TermToken> stateModifiers = [.. other.StateModifiers, .. StateModifiers];
-            return new StatefulClause(lm, sp, conditions, stateModifiers);
         }
 
         /// <summary>

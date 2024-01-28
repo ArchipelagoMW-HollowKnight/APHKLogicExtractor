@@ -38,6 +38,11 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         public StateModifierKind ClassifySingle(TermToken token)
         {
+            if (token is ComparisonToken)
+            {
+                // comparisons to state fields can never be beneficial, but may not always be detrimental
+                return StateModifierKind.Mixed;
+            }
             if (token is not SimpleToken st)
             {
                 return StateModifierKind.None;
