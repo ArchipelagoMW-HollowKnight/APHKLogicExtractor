@@ -69,20 +69,21 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             foreach (RawLogicDef transition in transitionLogic)
             {
                 List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, transition.name);
-                LogicObjectDefinition def = new(transition.name, clauses);
-                builder.AddOrUpdateLogicObject(def, false, true);
+                LogicObjectDefinition def = new(transition.name, clauses, LogicHandling.Transition);
+                builder.AddOrUpdateLogicObject(def);
             }
             foreach (RawWaypointDef waypoint in waypointLogic)
             {
                 List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, waypoint.name);
+                LogicHandling handling = waypoint.stateless ? LogicHandling.Location : LogicHandling.Default;
                 LogicObjectDefinition def = new(waypoint.name, clauses);
-                builder.AddOrUpdateLogicObject(def, waypoint.stateless, false);
+                builder.AddOrUpdateLogicObject(def);
             }
             foreach (RawLogicDef location in locationLogic)
             {
                 List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, location.name);
-                LogicObjectDefinition def = new(location.name, clauses);
-                builder.AddOrUpdateLogicObject(def, true, false);
+                LogicObjectDefinition def = new(location.name, clauses, LogicHandling.Location);
+                builder.AddOrUpdateLogicObject(def);
             }
 
             logger.LogInformation("Beginning final output");
@@ -93,7 +94,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     logger.LogWarning($"Region {region.Name} has no exits or locations, rendering it useless");
                 }
             }
-            builder.Validate();
             GraphWorldDefinition world = builder.Build();
             using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))
             {

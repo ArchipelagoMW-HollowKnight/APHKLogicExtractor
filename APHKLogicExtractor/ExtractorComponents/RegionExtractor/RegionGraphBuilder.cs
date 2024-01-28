@@ -20,15 +20,15 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             AddRegion("Menu");
         }
 
-        public void AddOrUpdateLogicObject(LogicObjectDefinition logicObject, bool isLocation, bool isTransition)
+        public void AddOrUpdateLogicObject(LogicObjectDefinition logicObject)
         {
             Region r = regions.GetValueOrDefault(logicObject.Name) ?? AddRegion(logicObject.Name);
-            if (isLocation)
+            if (logicObject.Handling == LogicHandling.Location)
             {
                 r.Locations.Add(logicObject.Name);
                 AddLocation(logicObject.Name);
             }
-            if (isTransition)
+            if (logicObject.Handling == LogicHandling.Transition)
             {
                 transitions.Add(logicObject.Name);
             }
@@ -131,7 +131,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return (items, locations);
         }
 
-        public void Validate()
+        private void Validate()
         {
             List<string> aggregatedErrors = [];
             // ensure no locations are duplicated across regions
