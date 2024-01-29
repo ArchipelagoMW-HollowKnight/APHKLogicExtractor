@@ -43,7 +43,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 {
                     // if this is a self-loop onto a transition region, this isn't a "real" edge,
                     // put the logic on the transition object instead;
-                    t.Logic.Add(new RequirementBranch(
+                    t!.Logic.Add(new RequirementBranch(
                         itemReqs,
                         locationReqs,
                         clause.StateModifiers.Select(c => c.Write()).ToList()));

@@ -16,7 +16,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             if (optionsService.Value.ClassifierModelPath != null)
             {
                 classificationModel = JsonUtil.DeserializeFromFile<StateClassificationModel>(optionsService.Value.ClassifierModelPath)
-                    ?? throw new NullReferenceException("Got null when deserializing state classification model");
+                    ?? new([], []);
             }
             else
             {
