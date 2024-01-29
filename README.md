@@ -3,11 +3,16 @@
 Command line application for extracting RandomizerCore logic to Archipelago structures. It is comprised of multiple
 component jobs which run in parallel.
 
+* [General command line arguments](#general-command-line-arguments)
 * [Region extractor](#region-extractor)
     + [Loading HK logic from upstream](#loading-hk-logic-from-upstream)
     + [Loading RandomizerCore logic from a locally serialized RandoContext](#loading-randomizercore-logic-from-a-locally-serialized-randocontext)
     + [Loading non-RandomizerCore logic from a local world definition](#loading-non-randomizercore-logic-from-a-local-world-definition)
     + [Modifying reduction of state modifiers](#modifying-reduction-of-state-modifiers)
+
+## General command line arguments
+
+The command line argument `--Output` can be used to specify a folder path to place output files. The default is `./output`.
 
 ## Region extractor
 
@@ -30,6 +35,9 @@ file with all the information necessary to construct Archipelago regions and loc
     * Name - the name of the transition
     * ParentRegion - the name of the region in which this transition is contained
     * Logic - a list of logic requirements (explained below)
+
+The extractor job also generates a GraphViz dot file which can be used to visualize the created region graph (you'll want to export
+as svg to prevent compression).
 
 Logic requirements are always presented as a list of alternatives. In other words, in Archipelago, after modeling each requirement
 object, the access rule for an Entrance/Location can be checked as `all(lambda req: req.satisfied(state), logic)`. Each requirement
