@@ -13,7 +13,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private Dictionary<string, GraphLocation> locations = new();
         private Dictionary<string, RandomizableTransition> transitions = new();
         private Dictionary<string, HashSet<RandomizableTransition>> transitionsByParentRegion = new();
-        private Dictionary<string, HashSet<Region>> parentLookup = new();
         public IReadOnlyDictionary<string, Region> Regions => regions;
 
         public RegionGraphBuilder() 
@@ -52,12 +51,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
 
                 parent.Connect(itemReqs, locationReqs, clause.StateModifiers.Select(c => c.Write()), r);
-                if (!parentLookup.TryGetValue(logicObject.Name, out HashSet<Region>? parents))
-                {
-                    parents = new HashSet<Region>();
-                    parentLookup[logicObject.Name] = parents;
-                }
-                parents.Add(parent);
             }
         }
 
@@ -184,7 +177,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private void Clean(StateModifierClassifier classifier)
         {
             RemoveRedundantLogicBranches(classifier);
-            while (regions.Values.Any(TryMergeIntoParent)) 
+            while (regions.Values.Any(TryMergeIntoParent) || regions.Values.Any(TryMergeLogicless2Cycle)) 
             {
                 RemoveRedundantLogicBranches(classifier);
             }
@@ -205,11 +198,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         {
             Region r = regions[name];
             regions.Remove(name);
-            foreach (Region region in parentLookup.GetValueOrDefault(name) ?? Enumerable.Empty<Region>())
+            foreach (Region region in r.Parents)
             {
                 region.Disconnect(r);
             }
-            parentLookup.Remove(name);
         }
 
         private bool IsBranchDefinitelyImproved(
@@ -281,14 +273,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         private bool TryMergeIntoParent(Region child)
         {
-            // if the region has no exits it is not safe to merge destructively in this manner
+            // if the region has any exits it is not safe to merge destructively in this manner
             if (child.Exits.Count != 0)
             {
                 return false;
             }
 
             // needs a single parent to have a well-defined merge
-            IReadOnlySet<Region> parents = parentLookup.GetValueOrDefault(child.Name, []);
+            IReadOnlySet<Region> parents = child.Parents;
             if (parents.Count != 1)
             {
                 return false;
@@ -340,11 +332,58 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                         t.Logic.AddRange(newBranches);
                     }
                 }
-                transitionsByParentRegion.Remove(child.Name);
-                HashSet<RandomizableTransition> addTo = transitionsByParentRegion.GetValueOrDefault(child.Name, []);
+                HashSet<RandomizableTransition> addTo = transitionsByParentRegion.GetValueOrDefault(parent.Name, []);
                 addTo.UnionWith(ts);
-                transitionsByParentRegion[child.Name] = addTo;
+                transitionsByParentRegion[parent.Name] = addTo;
+                transitionsByParentRegion.Remove(child.Name);
             }
+            return true;
+        }
+
+        private bool TryMergeLogicless2Cycle(Region parent)
+        {
+            IEnumerable<Region> absorbableRegions = parent.Exits
+                .Where(edge => edge.Logic.All(branch => branch.IsEmpty))
+                .Select(edge => edge.Target)
+                .Where(target => target != parent && target.Exits
+                    .Any(backEdge => backEdge.Logic.All(branch => branch.IsEmpty) && backEdge.Target == parent));
+            if (!absorbableRegions.Any())
+            {
+                return false;
+            }
+
+            // we have successfully found one or more 2-cycles which has no requirements in either direction.
+            // that means these regions are topologically equivalent, so we can absorb all the contents of the
+            // other region(s) and delete them. To avoid modifying while iterating we will solve one at a time.
+            Region child = absorbableRegions.First();
+            parent.Locations.UnionWith(child.Locations);
+            // need a copy so we don't modify while iterating
+            foreach (Connection childExit in child.Exits.Where(x => x.Target != parent).ToList())
+            {
+                parent.Connect(childExit.Logic, childExit.Target);
+                child.Disconnect(childExit.Target);
+            }
+            foreach (Region otherParent in child.Parents.Where(p => p != parent))
+            {
+                // get the link to the child
+                Connection conn = otherParent.Exits.First(x => x.Target == child);
+                // disconnect from the child
+                otherParent.Disconnect(child);
+                // connect to this
+                otherParent.Connect(conn.Logic, parent);
+            }
+            if (transitionsByParentRegion.TryGetValue(child.Name, out HashSet<RandomizableTransition>? ts))
+            {
+                foreach (RandomizableTransition t in ts)
+                {
+                    t.ParentRegion = parent.Name;
+                }
+                HashSet<RandomizableTransition> addTo = transitionsByParentRegion.GetValueOrDefault(parent.Name, []);
+                addTo.UnionWith(ts);
+                transitionsByParentRegion[parent.Name] = addTo;
+                transitionsByParentRegion.Remove(child.Name);
+            }
+            RemoveRegion(child.Name);
             return true;
         }
     }

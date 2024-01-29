@@ -109,16 +109,17 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
                 LogicManager preprocessorLm = new(preprocessorLmb);
                 List<LogicObjectDefinition> objects = [];
-                foreach (RawLogicDef transition in transitionLogic)
-                {
-                    List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, transition.name);
-                    objects.Add(new LogicObjectDefinition(transition.name, clauses, LogicHandling.Transition));
-                }
+                // add waypoints to the region list first since they usually have better names after merging
                 foreach (RawWaypointDef waypoint in waypointLogic)
                 {
                     List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, waypoint.name);
                     LogicHandling handling = waypoint.stateless ? LogicHandling.Location : LogicHandling.Default;
                     objects.Add(new LogicObjectDefinition(waypoint.name, clauses, handling));
+                }
+                foreach (RawLogicDef transition in transitionLogic)
+                {
+                    List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, transition.name);
+                    objects.Add(new LogicObjectDefinition(transition.name, clauses, LogicHandling.Transition));
                 }
                 foreach (RawLogicDef location in locationLogic)
                 {
