@@ -88,14 +88,16 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             DotGraph graph = new DotGraph().WithIdentifier("Graph").Directed();
             foreach (Region region in regions.Values)
             {
-                string htmlLabel = $"<b>{region.Name}</b>";
-                foreach (string loc in region.Locations)
-                {
-                    htmlLabel += $"<br/>{loc}";
-                }
+                string htmlLabel = $"""
+                    <table border="0" cellborder="1" cellspacing="0">
+                        <tr><td><b>{region.Name}</b></td></tr>
+                        <tr><td>{string.Join("<br/>", region.Locations)}</td></tr>
+                        <tr><td>{string.Join("<br/>", region.Transitions)}</td></tr>
+                    </table>
+                    """;
                 DotNode node = new DotNode()
                     .WithIdentifier(region.Name)
-                    .WithShape(DotNodeShape.Box)
+                    .WithShape(DotNodeShape.PlainText)
                     .WithLabel(htmlLabel, true);
                 graph.Add(node);
                 foreach (string target in region.Exits.Select(x => x.Target.Name))

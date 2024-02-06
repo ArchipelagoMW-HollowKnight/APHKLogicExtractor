@@ -137,7 +137,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             if (options.StartStateTerm != null)
             {
-                logger.LogInformation($"Rebasing start state from ${options.StartStateTerm} onto Menu");
+                logger.LogInformation($"Rebasing start state from {options.StartStateTerm} onto Menu");
                 builder.LabelRegionAsMenu(options.StartStateTerm);
             }
 
