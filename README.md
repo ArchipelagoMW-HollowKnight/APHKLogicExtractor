@@ -25,6 +25,7 @@ file with all the information necessary to construct Archipelago regions and loc
         * Target - the name of the target region
         * Logic - a list of logic requirements (explained below).
     * Locations - A list of location names which appear in the region
+    * Transitions - A list of randomizable transition names which appear in the region
 * Locations - A list of locations to create. Event locations may be included. Each location has the following properties:
     * Name - The name of the location
     * Logic - a list of logic requirements (explained below)
@@ -33,7 +34,6 @@ file with all the information necessary to construct Archipelago regions and loc
   entrances; a transition may appear in this list even if it cannot be used as an exit, and this data alone must be supplemented
   in order to determine the correct handling. Each transition has the following properties:
     * Name - the name of the transition
-    * ParentRegion - the name of the region in which this transition is contained
     * Logic - a list of logic requirements (explained below)
 
 The extractor job also generates a GraphViz dot file which can be used to visualize the created region graph (you'll want to export
@@ -54,7 +54,8 @@ on the main branch. If needed, a specific git ref can be set with the argument `
 
 Logic can be loaded from a locally serialized RandoContext object created by the RandomizerCore.Json library. This can be
 used for any RandomizerCore randomizer, including Hollow Knight with a non-default LogicManager (e.g. with connections enabled).
-Specify the path to the JSON file with the argument `--RandoContextPath`.
+Specify the path to the JSON file with the argument `--RandoContextPath`. To ensure good results, warnings for ambiguous, missing,
+or poorly ordered state providers should be resolved.
 
 ### Loading non-RandomizerCore logic from a local world definition
 

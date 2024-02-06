@@ -13,6 +13,8 @@ namespace APHKLogicExtractor.DataModel
 
         public HashSet<string> Locations { get; } = new();
 
+        public HashSet<string> Transitions { get; } = new();
+
         public void Connect(
             IEnumerable<string> requirements,
             IEnumerable<string> locationRequirements,

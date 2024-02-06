@@ -135,15 +135,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             {
                 builder.AddOrUpdateLogicObject(obj);
             }
+            if (options.StartStateTerm != null)
+            {
+                logger.LogInformation($"Rebasing start state from ${options.StartStateTerm} onto Menu");
+                builder.LabelRegionAsMenu(options.StartStateTerm);
+            }
 
             logger.LogInformation("Beginning final output");
-            foreach (Region region in builder.Regions.Values)
-            {
-                if (region.Locations.Count == 0 && region.Exits.Count == 0)
-                {
-                    logger.LogWarning($"Region {region.Name} has no exits or locations, rendering it useless");
-                }
-            }
             GraphWorldDefinition world = builder.Build(stateClassifier);
             using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))
             {

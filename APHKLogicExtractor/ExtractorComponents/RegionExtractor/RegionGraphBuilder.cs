@@ -12,7 +12,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private Dictionary<string, Region> regions = new();
         private Dictionary<string, GraphLocation> locations = new();
         private Dictionary<string, RandomizableTransition> transitions = new();
-        private Dictionary<string, HashSet<RandomizableTransition>> transitionsByParentRegion = new();
         public IReadOnlyDictionary<string, Region> Regions => regions;
 
         public RegionGraphBuilder() 
@@ -31,6 +30,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             RandomizableTransition? t = null;
             if (logicObject.Handling == LogicHandling.Transition)
             {
+                r.Transitions.Add(logicObject.Name);
                 t = AddTransition(logicObject.Name);
             }
             foreach (StatefulClause clause in logicObject.Logic)
@@ -52,6 +52,28 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
                 parent.Connect(itemReqs, locationReqs, clause.StateModifiers.Select(c => c.Write()), r);
             }
+        }
+
+        public void LabelRegionAsMenu(string regionName)
+        {
+            Region r = regions[regionName];
+            Region menu = regions["Menu"];
+
+            // If we're doing this, it's to rebase state propagation onto the Menu region,
+            // so the declared region should not have any locations, exits, or transitions
+            if (r.Exits.Count > 0 || r.Locations.Count > 0 || r.Transitions.Count > 0)
+            {
+                throw new InvalidOperationException("Should not merge state region into menu with any child objects");
+            }
+            // reconnect all parents to the menu region instead
+            // make a copy to avoid modification during iteration
+            foreach (Region parent in r.Parents.ToList())
+            {
+                Connection conn = parent.Exits.First(x => x.Target == r);
+                parent.Disconnect(r);
+                parent.Connect(conn.Logic, menu);
+            }
+            RemoveRegion(regionName);
         }
 
         public GraphWorldDefinition Build(StateModifierClassifier classfier)
@@ -105,9 +127,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         private RandomizableTransition AddTransition(string transitionName)
         {
-            RandomizableTransition t = new(transitionName, transitionName, []);
+            RandomizableTransition t = new(transitionName, []);
             transitions.Add(transitionName, t);
-            transitionsByParentRegion.Add(transitionName, [t]);
             return t;
         }
 
@@ -148,15 +169,35 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private void Validate()
         {
             List<string> aggregatedErrors = [];
+            // ensure no transitions are duplicated across regions
+            IEnumerable<string> duplicatedTransitions = regions.Values
+                .SelectMany(x => x.Transitions)
+                .GroupBy(x => x)
+                .Where(x => x.Count() > 1)
+                .Select(x => x.Key);
+            if (duplicatedTransitions.Any())
+            {
+                aggregatedErrors.Add($"The following transitions appeared in multiple regions: {string.Join(", ", duplicatedTransitions)}");
+            }
+
+            // ensure that the declared transitions are 1:1 with transitions in regions
+            HashSet<string> allTransitions = regions.Values.SelectMany(x => x.Transitions).ToHashSet();
+            if (transitions.Count != allTransitions.Count || !allTransitions.IsSupersetOf(transitions.Keys))
+            {
+                allTransitions.SymmetricExceptWith(transitions.Keys);
+                aggregatedErrors.Add($"Expected declared transitions to exactly match placed transitions, " +
+                    $"but the following were not matched: {string.Join(", ", allTransitions)}");
+            }
+
             // ensure no locations are duplicated across regions
-            IEnumerable<string> duplicated = regions.Values
+            IEnumerable<string> duplicatedLocactions = regions.Values
                 .SelectMany(x => x.Locations)
                 .GroupBy(x => x)
                 .Where(x => x.Count() > 1)
                 .Select(x => x.Key);
-            if (duplicated.Any())
+            if (duplicatedLocactions.Any())
             {
-                aggregatedErrors.Add($"The following locations appeared in multiple regions: {string.Join(", ", duplicated)}");
+                aggregatedErrors.Add($"The following locations appeared in multiple regions: {string.Join(", ", duplicatedLocactions)}");
             }
 
             // ensure that the declared locations are 1:1 with locations in regions
@@ -312,30 +353,26 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     l.Logic.AddRange(newBranches);
                 }
             }
-            // if this region is a randomizable transition, pull it up a level and prepend edge logic
-            if (transitionsByParentRegion.TryGetValue(child.Name, out HashSet<RandomizableTransition>? ts))
+            // pull randomizable transitions into the parent region and prepend edge logic
+            // to the transition logic on the child node
+            foreach (string transition in child.Transitions)
             {
-                foreach (RandomizableTransition t in ts)
+                parent.Transitions.Add(transition);
+
+                RandomizableTransition t = transitions[transition];
+                List<RequirementBranch> newBranches = [];
+                foreach (RequirementBranch cl in conn.Logic)
                 {
-                    t.ParentRegion = parent.Name;
-                    List<RequirementBranch> newBranches = [];
-                    foreach (RequirementBranch cl in conn.Logic)
+                    foreach (RequirementBranch tl in t.Logic)
                     {
-                        foreach (RequirementBranch tl in t.Logic)
-                        {
-                            newBranches.Add(cl + tl);
-                        }
-                    }
-                    if (conn.Logic.Count == 0)
-                    {
-                        t.Logic.Clear();
-                        t.Logic.AddRange(newBranches);
+                        newBranches.Add(cl + tl);
                     }
                 }
-                HashSet<RandomizableTransition> addTo = transitionsByParentRegion.GetValueOrDefault(parent.Name, []);
-                addTo.UnionWith(ts);
-                transitionsByParentRegion[parent.Name] = addTo;
-                transitionsByParentRegion.Remove(child.Name);
+                if (conn.Logic.Count > 0)
+                {
+                    t.Logic.Clear();
+                    t.Logic.AddRange(newBranches);
+                }
             }
             return true;
         }
@@ -357,6 +394,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             // other region(s) and delete them. To avoid modifying while iterating we will solve one at a time.
             Region child = absorbableRegions.First();
             parent.Locations.UnionWith(child.Locations);
+            parent.Transitions.UnionWith(child.Transitions);
             // need a copy so we don't modify while iterating
             foreach (Connection childExit in child.Exits.Where(x => x.Target != parent).ToList())
             {
@@ -371,17 +409,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 otherParent.Disconnect(child);
                 // connect to this
                 otherParent.Connect(conn.Logic, parent);
-            }
-            if (transitionsByParentRegion.TryGetValue(child.Name, out HashSet<RandomizableTransition>? ts))
-            {
-                foreach (RandomizableTransition t in ts)
-                {
-                    t.ParentRegion = parent.Name;
-                }
-                HashSet<RandomizableTransition> addTo = transitionsByParentRegion.GetValueOrDefault(parent.Name, []);
-                addTo.UnionWith(ts);
-                transitionsByParentRegion[parent.Name] = addTo;
-                transitionsByParentRegion.Remove(child.Name);
             }
             RemoveRegion(child.Name);
             return true;
