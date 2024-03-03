@@ -20,6 +20,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         DataLoader dataLoader,
         LogicLoader logicLoader,
         StateModifierClassifier stateClassifier,
+        Pythonizer pythonizer,
         OutputManager outputManager
     ) : BackgroundService
     {
@@ -153,6 +154,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     };
                     ser.Serialize(jtw, world);
                 }
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("region_data.py"))
+            {
+                pythonizer.Write(world, writer);
             }
             using (StreamWriter writer = outputManager.CreateOuputFileText("regionGraph.dot"))
             {
