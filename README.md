@@ -45,6 +45,14 @@ contains a set of item requirements (`state.has(item, player)`, possibly with a 
 (`state.can_reach(location, resolution_hint="Location", player=player)`), and an ordered list of state modifiers to apply. For more
 information on state logic, see the [RandomizerCore documentation](https://homothetyhk.github.io/RandomizerCore/articles/state.html).
 
+### Keeping empty regions for organizational purposes
+
+By default, the extractor will attempt to remove any redundant empty regions. If maintaining certain regions is desirable for
+organization (such as HK's Can_Bench and Can_Stag regions which have many entrances and exits which would be expensive to distribute),
+the `--EmptyRegionsToKeepPath` argument can be used. This should be a path to a JSON file containing a list of strings (region names)
+which should not be removed during this process. You can see an example of this for HK 
+[here](https://github.com/ArchipelagoMW-HollowKnight/APHKLogicExtractor/blob/master/APHKLogicExtractor/hkEmptyRegionsToKeep.json)
+
 ### Loading HK logic from upstream
 
 By default, when the extractor is run with no command line arguments, logic will be automatically pulled from the RandomizerMod repository
