@@ -186,6 +186,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             // remove FALSE clauses, and remove TRUE from all clauses
             IEnumerable<IEnumerable<TermToken>> clauses = dd.ToTermTokenSequences()
                 .Where(x => !x.Contains(ConstToken.False));
+            if (!clauses.Any())
+            {
+                return [new StatefulClause(null, new HashSet<TermToken>(1) { ConstToken.False }, [])];
+            }
             return clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True))).ToList();
         }
     }
