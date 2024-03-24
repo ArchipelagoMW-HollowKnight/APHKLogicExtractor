@@ -143,7 +143,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
 
             logger.LogInformation("Beginning final output");
-            GraphWorldDefinition world = builder.Build(stateClassifier);
+            HashSet<string>? regionsToKeep = null;
+            if (options.EmptyRegionsToKeepPath != null)
+            {
+                regionsToKeep = JsonUtil.DeserializeFromFile<HashSet<string>>(options.EmptyRegionsToKeepPath);
+            }
+            GraphWorldDefinition world = builder.Build(stateClassifier, regionsToKeep);
             using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))
             {
                 using (JsonTextWriter jtw = new(writer))
@@ -166,7 +171,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             logger.LogInformation("Successfully exported {} regions ({} empty) and {} locations", 
                 world.Regions.Count(), 
-                world.Regions.Where(r => r.Locations.Count == 0).Count(),
+                world.Regions.Where(r => r.Locations.Count == 0 && r.Transitions.Count == 0).Count(),
                 world.Locations.Count());
         }
 

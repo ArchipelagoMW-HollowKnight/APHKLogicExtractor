@@ -15,5 +15,7 @@
         public string? RandoContextPath { get; set; }
 
         public string? ClassifierModelPath { get; set; }
+
+        public string? EmptyRegionsToKeepPath { get; set; }
     }
 }

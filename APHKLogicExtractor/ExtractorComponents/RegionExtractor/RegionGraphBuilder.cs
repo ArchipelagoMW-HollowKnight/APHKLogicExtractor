@@ -76,10 +76,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             RemoveRegion(regionName);
         }
 
-        public GraphWorldDefinition Build(StateModifierClassifier classfier)
+        public GraphWorldDefinition Build(StateModifierClassifier classifier, IReadOnlySet<string>? regionsToKeep)
         {
             Validate();
-            Clean(classfier);
+            Clean(classifier, regionsToKeep ?? new HashSet<string>());
             return new GraphWorldDefinition(regions.Values, locations.Values, transitions.Values);
         }
 
@@ -217,10 +217,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
         }
 
-        private void Clean(StateModifierClassifier classifier)
+        private void Clean(StateModifierClassifier classifier, IReadOnlySet<string> regionsToKeep)
         {
             RemoveRedundantLogicBranches(classifier);
-            while (regions.Values.Any(TryMergeIntoParent) || regions.Values.Any(TryMergeLogicless2Cycle)) 
+            while (regions.Values.Any(TryMergeIntoParent) 
+                || regions.Values.Any(TryMergeLogicless2Cycle)
+                || regions.Values.Any(x => TryRemoveEmptyRegion(x, classifier, regionsToKeep))) 
             {
                 RemoveRedundantLogicBranches(classifier);
             }
@@ -244,6 +246,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             foreach (Region region in r.Parents)
             {
                 region.Disconnect(r);
+            }
+            foreach (Connection exit in r.Exits.ToList())
+            {
+                r.Disconnect(exit.Target);
             }
         }
 
@@ -341,19 +347,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 parent.Locations.Add(location);
 
                 GraphLocation l = locations[location];
-                List<RequirementBranch> newBranches = [];
-                foreach (RequirementBranch cl in conn.Logic)
-                {
-                    foreach (RequirementBranch ll in l.Logic)
-                    {
-                        newBranches.Add(cl + ll);
-                    }
-                }
-                if (conn.Logic.Count > 0)
-                {
-                    l.Logic.Clear();
-                    l.Logic.AddRange(newBranches);
-                }
+                List<RequirementBranch> newBranches = DistributeBranches(conn.Logic, l.Logic);
+                l.Logic.Clear();
+                l.Logic.AddRange(newBranches);
             }
             // pull randomizable transitions into the parent region and prepend edge logic
             // to the transition logic on the child node
@@ -362,19 +358,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 parent.Transitions.Add(transition);
 
                 RandomizableTransition t = transitions[transition];
-                List<RequirementBranch> newBranches = [];
-                foreach (RequirementBranch cl in conn.Logic)
-                {
-                    foreach (RequirementBranch tl in t.Logic)
-                    {
-                        newBranches.Add(cl + tl);
-                    }
-                }
-                if (conn.Logic.Count > 0)
-                {
-                    t.Logic.Clear();
-                    t.Logic.AddRange(newBranches);
-                }
+                List<RequirementBranch> newBranches = DistributeBranches(conn.Logic, t.Logic);
+                t.Logic.Clear();
+                t.Logic.AddRange(newBranches);
             }
             return true;
         }
@@ -414,6 +400,91 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             RemoveRegion(child.Name);
             return true;
+        }
+
+        private bool TryRemoveEmptyRegion(Region region, StateModifierClassifier classifier, IReadOnlySet<string> regionsToKeep)
+        {
+            // attempts to remove a placeholder region (no locations or transitions) by distributing incoming edges
+            // across outgoing edges. As such, the region must have both incoming and outgoing edges.
+            if (region.Locations.Any() || region.Transitions.Any() || !region.Parents.Any())
+            {
+                return false;
+            }
+
+            // if a region has a self-cycle (assumed to be state-modifying) it cannot be removed safely.
+            if (region.Parents.Contains(region))
+            {
+                return false;
+            }
+
+            // todo - make a generic block list of regions which should not be stripped out
+            if (regionsToKeep.Contains(region.Name))
+            {
+                return false;
+            }
+
+            // if it's a total dead end just kill it and move on
+            if (!region.Exits.Any())
+            {
+                RemoveRegion(region.Name);
+                return true;
+            }
+            
+            IEnumerable<(Region, Connection)> entrances = region.Parents
+                .SelectMany(parent => parent.Exits.Select(conn => (parent, conn)))
+                .Where(entrance => entrance.conn.Target == region)
+                .ToList();
+            // need a copy to avoid modification during iteration
+            IEnumerable<Connection> exits = region.Exits.ToList();
+            // axe this region
+            RemoveRegion(region.Name);
+
+            // surely this will have no negative performance implications
+            foreach (var (parent, entrance) in entrances)
+            {
+                foreach (var exit in exits)
+                {
+                    List<RequirementBranch> newBranches = DistributeBranches(entrance.Logic, exit.Logic);
+                    // in a self-cycle, any non-state-modifying branches are redundant (you cannot get to yourself without yourself).
+                    // strictly worse state modifiers are also redundant
+                    if (parent == exit.Target)
+                    {
+                        newBranches.RemoveAll(x => x.StateModifiers.Count == 0 
+                            || classifier.ClassifyMany(x.StateModifiers) == StateModifierKind.Detrimental);
+                        if (!newBranches.Any())
+                        {
+                            continue;
+                        }
+                    }
+                    parent.Connect(newBranches, exit.Target);
+                }
+            }
+            return true;
+        }
+
+        private List<RequirementBranch> DistributeBranches(List<RequirementBranch> left, List<RequirementBranch> right)
+        {
+            List<RequirementBranch> newBranches;
+            if (left.Count > 0 && right.Count > 0)
+            {
+                newBranches = [];
+                foreach (RequirementBranch l1 in left)
+                {
+                    foreach (RequirementBranch l2 in right)
+                    {
+                        newBranches.Add(l1 + l2);
+                    }
+                }
+            }
+            else if (left.Count == 0)
+            {
+                newBranches = right;
+            }
+            else
+            {
+                newBranches = right;
+            }
+            return newBranches;
         }
     }
 }
