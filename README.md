@@ -14,6 +14,9 @@ component jobs which run in parallel.
 
 The command line argument `--Output` can be used to specify a folder path to place output files. The default is `./output`.
 
+The command line argument `--Jobs` can be specified multiple times. `ExtractItems` and `ExtractRegions` are valid values. When not specified,
+all jobs will be run.
+
 ## Region extractor
 
 The region extractor is able to take string logic as an input (a variety of formats are possible) and outputs a JSON

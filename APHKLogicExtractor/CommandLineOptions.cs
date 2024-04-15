@@ -1,8 +1,16 @@
 ﻿namespace APHKLogicExtractor
 {
+    public enum JobType
+    {
+        ExtractRegions,
+        ExtractItems
+    }
+
     internal record CommandLineOptions
     {
         public string OutputPath { get; set; } = "./output";
+
+        public HashSet<JobType> Jobs { get; set; } = new();
 
         // Region extractor options
 

@@ -30,6 +30,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         {
             logger.LogInformation("Validating options");
 
+            if (options.Jobs.Any() && !options.Jobs.Contains(JobType.ExtractRegions))
+            {
+                logger.LogInformation("Job not requested, skipping");
+                return;
+            }
+
             logger.LogInformation("Beginning region extraction");
 
             StringWorldDefinition worldDefinition;

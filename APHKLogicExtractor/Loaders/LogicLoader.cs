@@ -1,5 +1,6 @@
 ﻿using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
+using RandomizerCore.StringItems;
 
 namespace APHKLogicExtractor.Loaders
 {
@@ -35,5 +36,8 @@ namespace APHKLogicExtractor.Loaders
 
         public async Task<List<RawWaypointDef>> LoadWaypoints() => await LoadJsonCached<List<RawWaypointDef>>(
             "RandomizerMod/Resources/Logic/waypoints.json");
+
+        public async Task<List<StringItemTemplate>> LoadItems() => await LoadJsonCached<List<StringItemTemplate>>(
+            "RandomizerMod/Resources/Logic/items.json");
     }
 }

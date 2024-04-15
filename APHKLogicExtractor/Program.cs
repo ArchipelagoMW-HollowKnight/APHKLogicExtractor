@@ -1,5 +1,6 @@
 ﻿using APHKLogicExtractor;
 using APHKLogicExtractor.ExtractorComponents;
+using APHKLogicExtractor.ExtractorComponents.ItemExtractor;
 using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
 using APHKLogicExtractor.Loaders;
 using CommandLiners;
@@ -34,6 +35,7 @@ builder.Services.AddSingleton<OutputManager>();
 builder.Services.AddSingleton<VariableParser>();
 builder.Services.AddSingleton<StateModifierClassifier>();
 builder.Services.AddHostedService<RegionExtractor>();
+builder.Services.AddHostedService<ItemExtractor>();
 
 IHost host = builder.Build();
 await host.StartAsync();
