@@ -1,4 +1,6 @@
-﻿namespace APHKLogicExtractor
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace APHKLogicExtractor
 {
     public enum JobType
     {
@@ -8,22 +10,20 @@
 
     internal record CommandLineOptions
     {
-        public string OutputPath { get; set; } = "./output";
+        /// <summary>
+        /// Path to the directory where the generated content will be placed.
+        /// </summary>
+        public string Output { get; set; } = "./output";
 
-        public HashSet<JobType> Jobs { get; set; } = new();
+        /// <summary>
+        /// Set of tasks that needs to run
+        /// </summary>
+        public HashSet<JobType> Jobs { get; set; } = [];
 
-        // Region extractor options
-
-        public string RefName { get; set; } = "master";
-
-        public string? StartStateTerm { get; set; }
-
-        public string? WorldDefinitionPath { get; set; }
-
-        public string? RandoContextPath { get; set; }
-
-        public string? ClassifierModelPath { get; set; }
-
-        public string? EmptyRegionsToKeepPath { get; set; }
+        /// <summary>
+        /// The input content
+        /// </summary>
+        [Required]
+        public string? Input { get; set; }
     }
 }

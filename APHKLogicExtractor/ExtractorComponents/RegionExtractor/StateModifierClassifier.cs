@@ -10,13 +10,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private VariableParser prefixParser;
         private StateClassificationModel classificationModel;
 
-        public StateModifierClassifier(IOptions<CommandLineOptions> optionsService, VariableParser prefixParser)
+        public StateModifierClassifier(ApplicationInput input, VariableParser prefixParser)
         {
             this.prefixParser = prefixParser;
-            if (optionsService.Value.ClassifierModelPath != null)
+            if (input.classifierModel != null)
             {
-                classificationModel = JsonUtil.DeserializeFromFile<StateClassificationModel>(optionsService.Value.ClassifierModelPath)
-                    ?? new([], []);
+                classificationModel = input.classifierModel.GetContent().Result ?? new([], []);
             }
             else
             {
