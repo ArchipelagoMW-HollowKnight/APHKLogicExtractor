@@ -14,19 +14,14 @@ public enum InputType
     WorldDefinition,
 }
 
-public record ApplicationInput
+internal record ApplicationInput
 {
-    [JsonProperty]
-    internal InputType type;
+    public InputType Type { get; set; }
     // JsonLogic => JsonLogicConfiguration
     // RandoContext => JToken
     // WorldDefinition => StringWorldDefinition
-    [JsonProperty]
-    internal MaybeFile<JToken> configuration;
-    [JsonProperty]
-    internal string? startStateTerm;
-    [JsonProperty]
-    internal MaybeFile<StateClassificationModel>? classifierModel;
-    [JsonProperty]
-    internal MaybeFile<HashSet<string>>? emptyRegionsToKeep;
+    public MaybeFile<JToken> Configuration { get; set; }
+    public string? StartStateTerm { get; set; }
+    public MaybeFile<StateClassificationModel>? ClassifierModel { get; set; }
+    public MaybeFile<HashSet<string>>? EmptyRegionsToKeep { get; set; }
 }

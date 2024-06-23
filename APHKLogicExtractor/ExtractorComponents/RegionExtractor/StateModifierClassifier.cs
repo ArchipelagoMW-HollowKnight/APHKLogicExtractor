@@ -13,9 +13,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         public StateModifierClassifier(ApplicationInput input, VariableParser prefixParser)
         {
             this.prefixParser = prefixParser;
-            if (input.classifierModel != null)
+            if (input.ClassifierModel != null)
             {
-                classificationModel = input.classifierModel.GetContent().Result ?? new([], []);
+                classificationModel = input.ClassifierModel.GetContent().Result ?? new([], []);
             }
             else
             {

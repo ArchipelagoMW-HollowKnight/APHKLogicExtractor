@@ -11,7 +11,7 @@ public static class JsonUtils
     {
         return new JsonSerializer
         {
-            DefaultValueHandling = DefaultValueHandling.Include,
+            DefaultValueHandling = DefaultValueHandling.Ignore,
             TypeNameHandling = TypeNameHandling.Auto,
             Formatting = Formatting.Indented,
             ContractResolver = new RCContractResolver(),

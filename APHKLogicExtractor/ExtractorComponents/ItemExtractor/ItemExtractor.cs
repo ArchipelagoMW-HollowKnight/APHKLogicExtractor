@@ -38,15 +38,15 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             logger.LogInformation("Beginning item extraction");
 
             logger.LogInformation("Fetching logic");
-            var configuration = await input.configuration.GetContent<JsonLogicConfiguration>();
-            var rawTerms = (await configuration.logic?.terms?.GetContent()) ?? [];
-            var terms = RC.Utils.assembleTerms(rawTerms);
-            var stateData = await configuration?.logic?.state?.GetContent();
-            var transitionLogic = await configuration?.logic?.transitions?.GetContent();
-            var locationLogic = await configuration?.logic?.locations?.GetContent();
-            var macroLogic = await configuration?.logic?.macros?.GetContent();
-            var waypointLogic = await configuration?.logic?.waypoints?.GetContent();
-            var itemTemplates = await configuration?.logic?.items?.GetContent();
+            JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
+            Dictionary<string, List<string>> rawTerms = (await configuration.Logic?.Terms?.GetContent()) ?? [];
+            TermCollectionBuilder terms = RC.Utils.AssembleTerms(rawTerms);
+            RawStateData stateData = await configuration?.Logic?.State?.GetContent();
+            List<RawLogicDef> transitionLogic = await configuration?.Logic?.Transitions?.GetContent();
+            List<RawLogicDef> locationLogic = await configuration?.Logic?.Locations?.GetContent();
+            Dictionary<string, string> macroLogic = await configuration?.Logic?.Macros?.GetContent();
+            List<RawWaypointDef> waypointLogic = await configuration?.Logic?.Waypoints?.GetContent();
+            List<StringItemTemplate> itemTemplates = await configuration?.Logic?.Items?.GetContent();
 
             logger.LogInformation("Preparing logic manager");
             LogicManagerBuilder preprocessorLmb = new() { VariableResolver = new DummyVariableResolver() };

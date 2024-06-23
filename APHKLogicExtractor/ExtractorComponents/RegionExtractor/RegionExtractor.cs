@@ -33,11 +33,11 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
             logger.LogInformation("Beginning region extraction");
 
-            StringWorldDefinition worldDefinition = await (input.type switch
+            StringWorldDefinition worldDefinition = await (input.Type switch
             {
-                InputType.WorldDefinition => input.configuration.GetContent<StringWorldDefinition>(),
-                InputType.RandoContext => stringWorldCompositor.FromContext(input.configuration),
-                InputType.JsonLogic => stringWorldCompositor.FromLogicFiles(input.configuration),
+                InputType.WorldDefinition => input.Configuration.GetContent<StringWorldDefinition>(),
+                InputType.RandoContext => stringWorldCompositor.FromContext(input.Configuration),
+                InputType.JsonLogic => stringWorldCompositor.FromLogicFiles(input.Configuration),
                 _ => throw new NotImplementedException(),
             });
 
@@ -47,17 +47,17 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             {
                 builder.AddOrUpdateLogicObject(obj);
             }
-            if (input.startStateTerm != null)
+            if (input.StartStateTerm != null)
             {
-                logger.LogInformation($"Rebasing start state from {input.startStateTerm} onto Menu");
-                builder.LabelRegionAsMenu(input.startStateTerm);
+                logger.LogInformation($"Rebasing start state from {input.StartStateTerm} onto Menu");
+                builder.LabelRegionAsMenu(input.StartStateTerm);
             }
 
             logger.LogInformation("Beginning final output");
             HashSet<string>? regionsToKeep = null;
-            if (input.emptyRegionsToKeep != null)
+            if (input.EmptyRegionsToKeep != null)
             {
-                regionsToKeep = await input.emptyRegionsToKeep.GetContent();
+                regionsToKeep = await input.EmptyRegionsToKeep.GetContent();
             }
             GraphWorldDefinition world = builder.Build(stateClassifier, regionsToKeep);
             using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))

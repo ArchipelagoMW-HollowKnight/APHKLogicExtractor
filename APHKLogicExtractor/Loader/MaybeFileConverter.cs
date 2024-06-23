@@ -23,7 +23,7 @@ public class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
         // The token is a string, therefore we'll try to load using the resourceLoader.
         if (reader.TokenType == JsonToken.String)
         {
-            var instance = Activator.CreateInstance(objectType);
+            object? instance = Activator.CreateInstance(objectType);
             objectType.GetProperty("Lazy")?.SetValue(instance, (resourceLoader, reader.Value as string));
             return instance;
         }
@@ -32,17 +32,17 @@ public class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
         if (reader.TokenType == JsonToken.StartObject || reader.TokenType == JsonToken.StartArray)
         {
             // Grabs `MaybeFile` generic argument `T`
-            var innerType = objectType.GetGenericArguments()[0];
+            Type innerType = objectType.GetGenericArguments()[0];
 
-            var deserialized = serializer.Deserialize(reader, innerType);
-            var instance = Activator.CreateInstance(objectType);
+            object? deserialized = serializer.Deserialize(reader, innerType);
+            object? instance = Activator.CreateInstance(objectType);
             objectType.GetProperty(nameof(MaybeFile<object>.Content))?.SetValue(instance, deserialized);
             if (innerType == typeof(JToken))
                 objectType.GetProperty(nameof(MaybeFile<object>.Serializer))?.SetValue(instance, serializer);
             return instance;
         }
 
-        throw new Exception($"Unable to deserialize token {reader.TokenType}.");
+        throw new JsonSerializationException($"Unable to deserialize token {reader.TokenType}.");
     }
 
     public override void WriteJson(
@@ -50,20 +50,16 @@ public class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
         object? value,
         JsonSerializer serializer)
     {
-        var objType = value?.GetType();
-        if (objType == null || objType.GetGenericTypeDefinition() != target)
-        {
-            throw new Exception($"Was expecting a MaybeFile");
-        }
+        Type objType = value!.GetType();
 
-        var lazy = objType.GetProperty(nameof(MaybeFile<object>.Lazy))?.GetValue(value);
+        object? lazy = objType.GetProperty(nameof(MaybeFile<object>.Lazy))?.GetValue(value);
         if (lazy != null)
         {
             serializer.Serialize(writer, null);
             return;
         }
 
-        var content = objType.GetProperty(nameof(MaybeFile<object>.Content))?.GetValue(value);
+        object? content = objType.GetProperty(nameof(MaybeFile<object>.Content))?.GetValue(value);
         serializer.Serialize(writer, content);
     }
 }
@@ -79,25 +75,25 @@ public class MaybeFile<T> where T : class
         return this.GetContent<T>();
     }
 
-    public async Task<T2> GetContent<T2>() where T2 : class
+    public async Task<U> GetContent<U>() where U : class
     {
         if (this.Lazy != null)
         {
             var (loader, uri) = this.Lazy.Value;
-            var rawContent = await loader.Load(uri);
+            ResourceLoader.Content rawContent = await loader.Load(uri);
 
-            this.Content = rawContent.AsJson<T2>();
+            this.Content = rawContent.AsJson<U>();
             this.Lazy = null;
         }
 
-        if (this.Serializer != null && typeof(T2) != typeof(JToken) && this.Content is JToken tokens)
+        if (this.Serializer != null && typeof(U) != typeof(JToken) && this.Content is JToken tokens)
         {
-            this.Content = tokens.ToObject<T2>(this.Serializer);
+            this.Content = tokens.ToObject<U>(this.Serializer);
         }
 
-        if (this.Content is T2 content)
+        if (this.Content is U content)
             return content;
 
-        throw new Exception($"Unable to cast content to the given type: {typeof(T2)} from {this.Content?.GetType().ToString() ?? "null"}");
+        throw new InvalidCastException($"Unable to cast content to the given type: {typeof(U)} from {this.Content?.GetType().ToString() ?? "null"}");
     }
 };

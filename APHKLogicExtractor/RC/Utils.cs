@@ -4,7 +4,7 @@ namespace APHKLogicExtractor.RC;
 
 public class Utils
 {
-    public static TermCollectionBuilder assembleTerms(Dictionary<string, List<string>> terms)
+    public static TermCollectionBuilder AssembleTerms(Dictionary<string, List<string>> terms)
     {
         TermCollectionBuilder termsBuilder = new();
         foreach (var (type, termsOfType) in terms)

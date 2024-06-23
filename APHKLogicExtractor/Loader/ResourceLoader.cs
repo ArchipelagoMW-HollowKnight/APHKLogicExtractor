@@ -60,15 +60,15 @@ public class ResourceLoader(ILogger<ResourceLoader> logger)
     private async Task<byte[]> GetHttp(string uri)
     {
         // Try to grab cached remote file.
-        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(uri)));
-        var cachePath = Path.Join(CACHE_DIR, hash);
+        string hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(uri)));
+        string cachePath = Path.Join(CACHE_DIR, hash);
         if (File.Exists(cachePath))
             return await File.ReadAllBytesAsync(cachePath);
 
         // Get the remote file.
         using HttpResponseMessage response = await ResourceLoader.client.GetAsync(uri);
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsByteArrayAsync();
+        byte[] content = await response.Content.ReadAsByteArrayAsync();
 
         // Cache remote file on disk
         logger.LogDebug("Caching content for {uri} on disk at: {cachePath}", uri, cachePath);
@@ -81,15 +81,15 @@ public class ResourceLoader(ILogger<ResourceLoader> logger)
     public async Task<Content> Load(string path)
     {
         // Grab lock on resource.
-        var lockable = cache.GetOrAdd(path, new ResourceLock<byte[]?>(null));
-        using var guard = await lockable.Enter(TimeSpan.FromSeconds(30));
+        ResourceLock<byte[]?> lockable = cache.GetOrAdd(path, new ResourceLock<byte[]?>(null));
+        using ResourceLock<byte[]?>.LockGuard guard = await lockable.Enter(TimeSpan.FromSeconds(30));
 
         // If isn't cached, load it.
         if (guard.Value == null)
         {
             logger.LogDebug("Loading content of: {path}", path);
             var parsed = new ResourcePathParser(path);
-            var data = await (parsed switch
+            byte[] data = await (parsed switch
             {
                 { protocol: "http" } or { protocol: "https" } => this.GetHttp(parsed.Uri),
                 _ => File.ReadAllBytesAsync(parsed.path)
@@ -132,7 +132,7 @@ public class ResourceLoader(ILogger<ResourceLoader> logger)
             return JsonUtils
                 .GetSerializer(resourceLoader)
                 .DeserializeFromStream<T>(this.AsStream()) ??
-                    throw new Exception("Unable to decode file content as JSON.");
+                    throw new JsonSerializationException("Unable to decode file content as JSON.");
         }
     }
 }

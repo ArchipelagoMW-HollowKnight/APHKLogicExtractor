@@ -12,7 +12,7 @@ public class ResourceLock<T>(T resource)
             return new LockGuard(this);
         }
 
-        throw new Exception("Unable to get lock to requested resource");
+        throw new InvalidOperationException("Unable to get lock to requested resource");
     }
 
     public class LockGuard(ResourceLock<T> resourceLock) : IDisposable
@@ -24,13 +24,13 @@ public class ResourceLock<T>(T resource)
             get
             {
                 if (this.resourceLock == null)
-                    throw new Exception("Read from released lock");
+                    throw new InvalidOperationException("Read from released lock");
                 return this.resourceLock.resource;
             }
             set
             {
                 if (this.resourceLock == null)
-                    throw new Exception("Write into released lock");
+                    throw new InvalidOperationException("Write into released lock");
                 this.resourceLock.resource = value;
             }
         }

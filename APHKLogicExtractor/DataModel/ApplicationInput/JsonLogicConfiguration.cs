@@ -8,36 +8,24 @@ namespace APHKLogicExtractor.DataModel;
 
 internal record JsonLogicConfiguration
 {
-    [JsonProperty]
-    internal Data? data;
-    [JsonProperty]
-    internal Logic? logic;
+    public JsonData? Data { get; set; }
+    public JsonLogic? Logic { get; set; }
+}
 
-    internal record Data
-    {
-        [JsonProperty]
-        internal MaybeFile<Dictionary<string, RoomDef>>? rooms;
-        [JsonProperty]
-        internal MaybeFile<Dictionary<string, LocationDef>>? locations;
-        [JsonProperty]
-        internal MaybeFile<Dictionary<string, TransitionDef>>? transitions;
-    }
+internal record JsonData
+{
+    public MaybeFile<Dictionary<string, RoomDef>>? Rooms { get; set; }
+    public MaybeFile<Dictionary<string, LocationDef>>? Locations { get; set; }
+    public MaybeFile<Dictionary<string, TransitionDef>>? Transitions { get; set; }
+}
 
-    internal record Logic
-    {
-        [JsonProperty]
-        internal MaybeFile<Dictionary<string, List<string>>>? terms;
-        [JsonProperty]
-        internal MaybeFile<RawStateData>? state;
-        [JsonProperty]
-        internal MaybeFile<Dictionary<string, string>>? macros;
-        [JsonProperty]
-        internal MaybeFile<List<RawLogicDef>>? transitions;
-        [JsonProperty]
-        internal MaybeFile<List<RawLogicDef>>? locations;
-        [JsonProperty]
-        internal MaybeFile<List<RawWaypointDef>>? waypoints;
-        [JsonProperty]
-        internal MaybeFile<List<StringItemTemplate>>? items;
-    }
+internal record JsonLogic
+{
+    public MaybeFile<Dictionary<string, List<string>>>? Terms { get; set; }
+    public MaybeFile<RawStateData>? State { get; set; }
+    public MaybeFile<Dictionary<string, string>>? Macros { get; set; }
+    public MaybeFile<List<RawLogicDef>>? Transitions { get; set; }
+    public MaybeFile<List<RawLogicDef>>? Locations { get; set; }
+    public MaybeFile<List<RawWaypointDef>>? Waypoints { get; set; }
+    public MaybeFile<List<StringItemTemplate>>? Items { get; set; }
 }

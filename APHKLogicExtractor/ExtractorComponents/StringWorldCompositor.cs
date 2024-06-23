@@ -52,14 +52,14 @@ internal class StringWorldCompositor(
     public async Task<StringWorldDefinition> FromLogicFiles(MaybeFile<JToken> input)
     {
         logger.LogInformation("Constructing Rando4 logic from files");
-        var configuration = await input.GetContent<JsonLogicConfiguration>();
-        var rawTerms = (await configuration.logic?.terms?.GetContent()) ?? [];
-        var terms = RC.Utils.assembleTerms(rawTerms);
-        var stateData = await configuration?.logic?.state?.GetContent();
-        var transitionLogic = await configuration?.logic?.transitions?.GetContent();
-        var locationLogic = await configuration?.logic?.locations?.GetContent();
-        var macroLogic = await configuration?.logic?.macros?.GetContent();
-        var waypointLogic = await configuration?.logic?.waypoints?.GetContent();
+        JsonLogicConfiguration configuration = await input.GetContent<JsonLogicConfiguration>();
+        Dictionary<string, List<string>> rawTerms = (await configuration.Logic?.Terms?.GetContent()) ?? [];
+        TermCollectionBuilder terms = RC.Utils.AssembleTerms(rawTerms);
+        RawStateData stateData = await configuration?.Logic?.State?.GetContent();
+        List<RawLogicDef> transitionLogic = await configuration?.Logic?.Transitions?.GetContent();
+        List<RawLogicDef> locationLogic = await configuration?.Logic?.Locations?.GetContent();
+        Dictionary<string, string> macroLogic = await configuration?.Logic?.Macros?.GetContent();
+        List<RawWaypointDef> waypointLogic = await configuration?.Logic?.Waypoints?.GetContent();
 
         logger.LogInformation("Preparing logic manager");
         LogicManagerBuilder preprocessorLmb = new() { VariableResolver = new DummyVariableResolver() };
