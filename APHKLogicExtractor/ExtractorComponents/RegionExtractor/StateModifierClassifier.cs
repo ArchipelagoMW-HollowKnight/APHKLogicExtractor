@@ -15,7 +15,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             this.prefixParser = prefixParser;
             if (input.ClassifierModel != null)
             {
-                classificationModel = input.ClassifierModel.GetContent().Result ?? new([], []);
+                classificationModel = input.ClassifierModel.GetContent().Result;
             }
             else
             {

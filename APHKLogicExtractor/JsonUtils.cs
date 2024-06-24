@@ -7,7 +7,7 @@ namespace APHKLogicExtractor;
 
 public static class JsonUtils
 {
-    public static JsonSerializer GetSerializer(ResourceLoader resourceLoader)
+    internal static JsonSerializer GetSerializer(ResourceLoader resourceLoader)
     {
         return new JsonSerializer
         {

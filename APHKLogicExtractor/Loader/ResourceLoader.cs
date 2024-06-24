@@ -2,56 +2,13 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using RandomizerCore.Json;
 
 namespace APHKLogicExtractor.Loader;
 
-class ResourcePathParser
-{
-    public readonly string full;
-    public readonly string[] parts;
-    public readonly string protocol;
-    public readonly string path;
-    public readonly string? additional;
-
-    public ResourcePathParser(string path)
-    {
-        this.full = path;
-        this.parts = path.Split(":");
-
-
-        if (this.parts.Length == 2)
-        {
-            if (this.parts[1].StartsWith("//"))
-            {
-                this.protocol = this.parts[0];
-                this.path = this.parts[1][2..];
-            }
-            else
-            {
-                this.protocol = "file";
-                this.path = this.parts[0];
-                this.additional = this.parts[1];
-            }
-        }
-        else if (this.parts.Length == 3)
-        {
-            this.protocol = this.parts[0];
-            this.path = this.parts[1][2..];
-            this.additional = this.parts[2];
-        }
-        else
-        {
-            this.protocol = "file";
-            this.path = this.parts[0];
-        }
-    }
-
-    public string Uri { get { return $"{this.protocol}://{this.path}"; } }
-}
-
-public class ResourceLoader(ILogger<ResourceLoader> logger)
+internal class ResourceLoader(IOptions<CommandLineOptions> options, ILogger<ResourceLoader> logger)
 {
     static readonly string CACHE_DIR = Path.Join(Path.GetTempPath(), "APLogicExtractor");
     static readonly HttpClient client = new();
@@ -62,8 +19,11 @@ public class ResourceLoader(ILogger<ResourceLoader> logger)
         // Try to grab cached remote file.
         string hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(uri)));
         string cachePath = Path.Join(CACHE_DIR, hash);
-        if (File.Exists(cachePath))
+        if (!options.Value.IgnoreCache && File.Exists(cachePath))
+        {
+            logger.LogInformation("Loading {uri} from cache ({cachePath})", uri, cachePath);
             return await File.ReadAllBytesAsync(cachePath);
+        }
 
         // Get the remote file.
         using HttpResponseMessage response = await ResourceLoader.client.GetAsync(uri);
@@ -71,7 +31,7 @@ public class ResourceLoader(ILogger<ResourceLoader> logger)
         byte[] content = await response.Content.ReadAsByteArrayAsync();
 
         // Cache remote file on disk
-        logger.LogDebug("Caching content for {uri} on disk at: {cachePath}", uri, cachePath);
+        logger.LogInformation("Caching content for {uri} on disk at: {cachePath}", uri, cachePath);
         Directory.CreateDirectory(CACHE_DIR);
         await File.WriteAllBytesAsync(cachePath, content);
 
@@ -87,13 +47,20 @@ public class ResourceLoader(ILogger<ResourceLoader> logger)
         // If isn't cached, load it.
         if (guard.Value == null)
         {
-            logger.LogDebug("Loading content of: {path}", path);
-            var parsed = new ResourcePathParser(path);
-            byte[] data = await (parsed switch
+            logger.LogInformation("Loading content of: {path}", path);
+            byte[] data = [];
+
+            string[] split = path.Split("://");
+            if (split.Length == 2)
             {
-                { protocol: "http" } or { protocol: "https" } => this.GetHttp(parsed.Uri),
-                _ => File.ReadAllBytesAsync(parsed.path)
-            });
+                if (split[0].StartsWith("http")) data = await this.GetHttp(path);
+                else if (split[0] == "file") data = await File.ReadAllBytesAsync(split[1]);
+                else throw new InvalidOperationException("Unsupported resource protocol");
+            }
+            else
+            {
+                data = await File.ReadAllBytesAsync(path);
+            }
 
             guard.Value = data;
         }

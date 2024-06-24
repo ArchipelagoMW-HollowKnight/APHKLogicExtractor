@@ -25,5 +25,10 @@ namespace APHKLogicExtractor
         /// Set of tasks that needs to run
         /// </summary>
         public HashSet<JobType> Jobs { get; set; } = [];
+
+        /// <summary>
+        /// When true, the resource cache will be ignored.
+        /// </summary>
+        public bool IgnoreCache { get; set; } = false;
     }
 }

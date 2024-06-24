@@ -5,13 +5,11 @@ using RandomizerCore.Json;
 
 namespace APHKLogicExtractor.Loader;
 
-public class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
+internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
 {
-    static readonly Type target = typeof(MaybeFile<>).GetGenericTypeDefinition();
-
     public override bool CanConvert(Type objectType)
     {
-        return objectType.IsGenericType && objectType.GetGenericTypeDefinition() == MaybeFileConverter.target;
+        return objectType.IsGenericType && objectType.GetGenericTypeDefinition() == typeof(MaybeFile<>);
     }
 
     public override object? ReadJson(
@@ -64,7 +62,7 @@ public class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
     }
 }
 
-public class MaybeFile<T> where T : class
+internal class MaybeFile<T> where T : class
 {
     public (ResourceLoader loader, string uri)? Lazy { get; set; }
     public JsonSerializer? Serializer { get; set; }
