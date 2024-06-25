@@ -1,4 +1,4 @@
-﻿using APHKLogicExtractor.Loaders;
+﻿using APHKLogicExtractor.DataModel;
 using APHKLogicExtractor.RC;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,15 +12,15 @@ using System.Reflection;
 namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
 {
     internal class ItemExtractor(
+        ApplicationInput input,
         ILogger<ItemExtractor> logger,
         IOptions<CommandLineOptions> optionsService,
-        LogicLoader logicLoader,
         Pythonizer pythonizer,
         OutputManager outputManager) : BackgroundService
     {
-        private static readonly FieldInfo AllOfEffect_Effects = 
+        private static readonly FieldInfo AllOfEffect_Effects =
             typeof(AllOfEffect).GetField("Effects", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        private static readonly FieldInfo FirstOfEffect_Effects = 
+        private static readonly FieldInfo FirstOfEffect_Effects =
             typeof(FirstOfEffect).GetField("Effects", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
         private CommandLineOptions options = optionsService.Value;
@@ -38,13 +38,29 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             logger.LogInformation("Beginning item extraction");
 
             logger.LogInformation("Fetching logic");
-            TermCollectionBuilder terms = await logicLoader.LoadTerms();
-            RawStateData stateData = await logicLoader.LoadStateFields();
-            List<RawLogicDef> transitionLogic = await logicLoader.LoadTransitions();
-            List<RawLogicDef> locationLogic = await logicLoader.LoadLocations();
-            Dictionary<string, string> macroLogic = await logicLoader.LoadMacros();
-            List<RawWaypointDef> waypointLogic = await logicLoader.LoadWaypoints();
-            List<StringItemTemplate> itemTemplates = await logicLoader.LoadItems();
+            JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
+            Dictionary<string, List<string>> rawTerms = [];
+            if (configuration.Logic?.Terms != null)
+                rawTerms = await configuration.Logic.Terms.GetContent();
+            TermCollectionBuilder terms = RC.Utils.AssembleTerms(rawTerms);
+            RawStateData stateData = new();
+            if (configuration?.Logic?.State != null)
+                stateData = await configuration.Logic.State.GetContent();
+            List<RawLogicDef> transitionLogic = [];
+            if (configuration?.Logic?.Transitions != null)
+                transitionLogic = await configuration.Logic.Transitions.GetContent();
+            List<RawLogicDef> locationLogic = [];
+            if (configuration?.Logic?.Locations != null)
+                locationLogic = await configuration.Logic.Locations.GetContent();
+            Dictionary<string, string> macroLogic = [];
+            if (configuration?.Logic?.Macros != null)
+                macroLogic = await configuration.Logic.Macros.GetContent();
+            List<RawWaypointDef> waypointLogic = [];
+            if (configuration?.Logic?.Waypoints != null)
+                waypointLogic = await configuration.Logic.Waypoints.GetContent();
+            List<StringItemTemplate> itemTemplates = [];
+            if (configuration?.Logic?.Items != null)
+                itemTemplates = await configuration.Logic.Items.GetContent();
 
             logger.LogInformation("Preparing logic manager");
             LogicManagerBuilder preprocessorLmb = new() { VariableResolver = new DummyVariableResolver() };
@@ -94,7 +110,7 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                 ConditionalEffect ce => $"if `{ce.Logic.InfixSource}` is {(ce.Negated ? "true" : "false")}, then {{{StringifyEffect(ce.Effect)}}}",
                 ReferenceEffect re when re.Item is StringItem ri => StringifyEffect(ri.Effect),
                 _ => throw new NotImplementedException("Unrecognized effect")
-            }; 
+            };
         }
     }
 }

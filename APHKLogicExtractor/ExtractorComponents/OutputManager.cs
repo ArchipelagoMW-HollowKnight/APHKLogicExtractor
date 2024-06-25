@@ -11,21 +11,21 @@ namespace APHKLogicExtractor.ExtractorComponents
 
         private void EnsureOutputPath()
         {
-            Directory.CreateDirectory(options.OutputPath);
+            Directory.CreateDirectory(options.Output);
         }
 
         public Stream CreateOutputFile(string name)
         {
             EnsureOutputPath();
             logger.LogDebug("Creating output file: {}", name);
-            return File.Create(Path.Combine(options.OutputPath, name));
+            return File.Create(Path.Combine(options.Output, name));
         }
 
         public StreamWriter CreateOuputFileText(string name)
         {
             EnsureOutputPath();
             logger.LogDebug("Creating output file: {}", name);
-            return File.CreateText(Path.Combine(options.OutputPath, name));
+            return File.CreateText(Path.Combine(options.Output, name));
         }
     }
 }

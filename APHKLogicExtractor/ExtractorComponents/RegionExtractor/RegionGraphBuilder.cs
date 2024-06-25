@@ -14,7 +14,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private Dictionary<string, RandomizableTransition> transitions = new();
         public IReadOnlyDictionary<string, Region> Regions => regions;
 
-        public RegionGraphBuilder() 
+        public RegionGraphBuilder()
         {
             AddRegion("Menu");
         }
@@ -85,7 +85,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         public DotGraph BuildDotGraph()
         {
-            DotGraph graph = new DotGraph().WithIdentifier("Graph").Directed();
+            DotGraph graph = new DotGraph().WithIdentifier("Regions").Directed();
             foreach (Region region in regions.Values)
             {
                 string htmlLabel = $"""
@@ -220,9 +220,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         private void Clean(StateModifierClassifier classifier, IReadOnlySet<string> regionsToKeep)
         {
             RemoveRedundantLogicBranches(classifier);
-            while (regions.Values.Any(TryMergeIntoParent) 
+            while (regions.Values.Any(TryMergeIntoParent)
                 || regions.Values.Any(TryMergeLogicless2Cycle)
-                || regions.Values.Any(x => TryRemoveEmptyRegion(x, classifier, regionsToKeep))) 
+                || regions.Values.Any(x => TryRemoveEmptyRegion(x, classifier, regionsToKeep)))
             {
                 RemoveRedundantLogicBranches(classifier);
             }
@@ -265,7 +265,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 return false;
             }
 
-            if (first.StateModifiers.Count >=  second.StateModifiers.Count)
+            if (first.StateModifiers.Count >= second.StateModifiers.Count)
             {
                 // if we have more modifiers, anything extra must be definitely positive
                 return Utils.HasSublistWithAdditionalModifiersOfKind(
@@ -429,7 +429,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 RemoveRegion(region.Name);
                 return true;
             }
-            
+
             IEnumerable<(Region, Connection)> entrances = region.Parents
                 .SelectMany(parent => parent.Exits.Select(conn => (parent, conn)))
                 .Where(entrance => entrance.conn.Target == region)
@@ -449,7 +449,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     // strictly worse state modifiers are also redundant
                     if (parent == exit.Target)
                     {
-                        newBranches.RemoveAll(x => x.StateModifiers.Count == 0 
+                        newBranches.RemoveAll(x => x.StateModifiers.Count == 0
                             || classifier.ClassifyMany(x.StateModifiers) == StateModifierKind.Detrimental);
                         if (!newBranches.Any())
                         {
