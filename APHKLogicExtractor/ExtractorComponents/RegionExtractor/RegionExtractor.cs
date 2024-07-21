@@ -45,7 +45,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             RegionGraphBuilder builder = new();
             foreach (LogicObjectDefinition obj in worldDefinition.LogicObjects)
             {
-                builder.AddOrUpdateLogicObject(obj);
+                builder.AddOrUpdateLogicObject(obj, worldDefinition.BackingLm);
             }
             if (input.StartStateTerm != null)
             {

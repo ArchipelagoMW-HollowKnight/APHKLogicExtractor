@@ -1,6 +1,7 @@
 ﻿using APHKLogicExtractor.DataModel;
 using DotNetGraph.Core;
 using DotNetGraph.Extensions;
+using RandomizerCore.Logic;
 using RandomizerCore.StringLogic;
 using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
@@ -19,9 +20,13 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             AddRegion("Menu");
         }
 
-        public void AddOrUpdateLogicObject(LogicObjectDefinition logicObject)
+        public void AddOrUpdateLogicObject(LogicObjectDefinition logicObject, LogicManager? lm)
         {
             Region r = regions.GetValueOrDefault(logicObject.Name) ?? AddRegion(logicObject.Name);
+            if (logicObject.Name == "Mines_10")
+            {
+
+            }
             if (logicObject.Handling == LogicHandling.Location)
             {
                 r.Locations.Add(logicObject.Name);
@@ -37,7 +42,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             {
                 string parentName = GetRegionName(clause.StateProvider);
                 Region parent = regions.GetValueOrDefault(parentName) ?? AddRegion(parentName);
-                var (itemReqs, locationReqs) = PartitionRequirements(clause.Conditions);
+                var (itemReqs, locationReqs, regionReqs) = PartitionRequirements(clause.Conditions, lm);
 
                 if (logicObject.Handling == LogicHandling.Transition && parent == r)
                 {
@@ -46,11 +51,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     t!.Logic.Add(new RequirementBranch(
                         itemReqs,
                         locationReqs,
+                        regionReqs,
                         clause.StateModifiers.Select(c => c.Write()).ToList()));
                     continue;
                 }
 
-                parent.Connect(itemReqs, locationReqs, clause.StateModifiers.Select(c => c.Write()), r);
+                parent.Connect(itemReqs, locationReqs, regionReqs, clause.StateModifiers.Select(c => c.Write()), r);
             }
         }
 
@@ -79,8 +85,16 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         public GraphWorldDefinition Build(StateModifierClassifier classifier, IReadOnlySet<string>? regionsToKeep)
         {
             Validate();
-            Clean(classifier, regionsToKeep ?? new HashSet<string>());
-            return new GraphWorldDefinition(regions.Values, locations.Values, transitions.Values);
+            Clean(classifier, regionsToKeep);
+            Dictionary<string, string> transitionToRegionMap = new();
+            foreach (Region r in regions.Values)
+            {
+                foreach (string t in r.Transitions)
+                {
+                    transitionToRegionMap[t] = r.Name;
+                }
+            }
+            return new GraphWorldDefinition(regions.Values, locations.Values, transitions.Values, transitionToRegionMap);
         }
 
         public DotGraph BuildDotGraph()
@@ -122,7 +136,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         private GraphLocation AddLocation(string locationName)
         {
-            GraphLocation l = new(locationName, [new RequirementBranch([], [], [])]);
+            GraphLocation l = new(locationName, [new RequirementBranch([], [], [], [])]);
             locations.Add(locationName, l);
             return l;
         }
@@ -142,11 +156,15 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             _ => throw new InvalidOperationException($"Tokens of type {token.GetType().FullName} are not valid region parents")
         };
 
-        private (HashSet<string> itemReqs, HashSet<string> locationReqs) PartitionRequirements(IEnumerable<TermToken> reqs)
+        private (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs) PartitionRequirements(
+            IEnumerable<TermToken> reqs,
+            LogicManager? lm
+        )
         {
             HashSet<string> items = new HashSet<string>();
             HashSet<string> locations = new HashSet<string>();
-            void Partition(TermToken t)
+            HashSet<string> regions = new HashSet<string>();
+            foreach (TermToken t in reqs)
             {
                 if (t is ReferenceToken rt)
                 {
@@ -154,18 +172,35 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
                 else if (t is ProjectedToken pt)
                 {
-                    Partition(pt.Inner);
+                    if (pt.Inner is ReferenceToken rtt)
+                    {
+                        locations.Add(rtt.Target);
+                    }
+                    else
+                    {
+                        regions.Add(pt.Inner.Write());
+                    }
                 }
                 else
                 {
-                    items.Add(t.Write());
+                    // bug workaround - at the time of writing, projection tokens are flattened by RC
+                    // so we have to semantically check our item requirements to see if they should have been projected
+                    string token = t.Write();
+                    if (lm != null && lm.GetTransition(token) != null)
+                    {
+                        regions.Add(token);
+                    }
+                    else if (lm != null && lm.Waypoints.Any(w => w.Name == token && w.term.Type == TermType.State))
+                    {
+                        regions.Add(token);
+                    }
+                    else 
+                    {
+                        items.Add(token);
+                    }
                 }
             }
-            foreach (TermToken t in reqs)
-            {
-                Partition(t);
-            }
-            return (items, locations);
+            return (items, locations, regions);
         }
 
         private void Validate()
@@ -217,12 +252,33 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
         }
 
-        private void Clean(StateModifierClassifier classifier, IReadOnlySet<string> regionsToKeep)
+        private void Clean(StateModifierClassifier classifier, IReadOnlySet<string>? regionsToKeep)
         {
+            HashSet<string> protectedRegions = [];
+            if (regionsToKeep != null)
+            {
+                protectedRegions.UnionWith(regionsToKeep);
+            }
+            foreach (GraphLocation l in locations.Values)
+            {
+                foreach (RequirementBranch b in l.Logic)
+                {
+                    protectedRegions.UnionWith(b.RegionRequirements);
+                }
+            }
+            // also protect any regions which were referenced by region requirements
+            foreach (RandomizableTransition t in transitions.Values)
+            {
+                foreach (RequirementBranch b in t.Logic)
+                {
+                    protectedRegions.UnionWith(b.RegionRequirements);
+                }
+            }
+
             RemoveRedundantLogicBranches(classifier);
-            while (regions.Values.Any(TryMergeIntoParent)
-                || regions.Values.Any(TryMergeLogicless2Cycle)
-                || regions.Values.Any(x => TryRemoveEmptyRegion(x, classifier, regionsToKeep)))
+            while (regions.Values.Any(x => TryMergeIntoParent(x, protectedRegions))
+                || regions.Values.Any(x => TryMergeLogicless2Cycle(x, protectedRegions))
+                || regions.Values.Any(x => TryRemoveEmptyRegion(x, classifier, protectedRegions)))
             {
                 RemoveRedundantLogicBranches(classifier);
             }
@@ -259,7 +315,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             StateModifierClassifier classifier)
         {
             bool reqsAreSubset = first.ItemRequirements.IsSubsetOf(second.ItemRequirements)
-                && first.LocationRequirements.IsSubsetOf(second.LocationRequirements);
+                && first.LocationRequirements.IsSubsetOf(second.LocationRequirements)
+                && first.RegionRequirements.IsSubsetOf(second.RegionRequirements);
             if (!reqsAreSubset)
             {
                 return false;
@@ -320,8 +377,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
         }
 
-        private bool TryMergeIntoParent(Region child)
+        private bool TryMergeIntoParent(Region child, IReadOnlySet<string> regionsToKeep)
         {
+            // do not merge me if I'm protected
+            if (regionsToKeep.Contains(child.Name))
+            {
+                return false;
+            }
+
             // if the region has any exits it is not safe to merge destructively in this manner
             if (child.Exits.Count != 0)
             {
@@ -365,11 +428,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return true;
         }
 
-        private bool TryMergeLogicless2Cycle(Region parent)
+        private bool TryMergeLogicless2Cycle(Region parent, IReadOnlySet<string> regionsToKeep)
         {
             IEnumerable<Region> absorbableRegions = parent.Exits
                 .Where(edge => edge.Logic.All(branch => branch.IsEmpty))
                 .Select(edge => edge.Target)
+                // doesn't matter how edible the child region looks if we are not allowed to eat it
+                // merging stuff into protected parents is ok though.
+                .Where(target => !regionsToKeep.Contains(target.Name))
                 .Where(target => target != parent && target.Exits
                     .Any(backEdge => backEdge.Logic.All(branch => branch.IsEmpty) && backEdge.Target == parent));
             if (!absorbableRegions.Any())
@@ -417,7 +483,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 return false;
             }
 
-            // todo - make a generic block list of regions which should not be stripped out
             if (regionsToKeep.Contains(region.Name))
             {
                 return false;

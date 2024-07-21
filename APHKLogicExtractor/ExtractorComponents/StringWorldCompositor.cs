@@ -12,8 +12,7 @@ using RandomizerCore.StringLogic;
 namespace APHKLogicExtractor.ExtractorComponents;
 
 internal class StringWorldCompositor(
-    ILogger<StringWorldCompositor> logger,
-    ResourceLoader resourceLoader
+    ILogger<StringWorldCompositor> logger
 )
 {
     public async Task<StringWorldDefinition> FromContext(MaybeFile<JToken> input)
@@ -46,7 +45,7 @@ internal class StringWorldCompositor(
             objects.Add(new LogicObjectDefinition(logic.Name, clauses, handling));
         }
 
-        return new StringWorldDefinition(objects);
+        return new StringWorldDefinition(objects, lm);
     }
 
     public async Task<StringWorldDefinition> FromLogicFiles(MaybeFile<JToken> input)
@@ -114,7 +113,7 @@ internal class StringWorldCompositor(
             objects.Add(new LogicObjectDefinition(location.name, clauses, LogicHandling.Location));
         }
 
-        return new StringWorldDefinition(objects);
+        return new StringWorldDefinition(objects, preprocessorLm);
     }
 
     private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)

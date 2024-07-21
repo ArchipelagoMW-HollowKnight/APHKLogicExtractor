@@ -21,6 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="hkConfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="hkEmptyRegionsToKeep.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

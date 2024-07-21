@@ -18,12 +18,14 @@ namespace APHKLogicExtractor.DataModel
         public void Connect(
             IEnumerable<string> requirements,
             IEnumerable<string> locationRequirements,
+            IEnumerable<string> regionRequirements,
             IEnumerable<string> stateModifiers,
             Region target)
         {
             RequirementBranch branch = new(
                 requirements.ToHashSet(),
                 locationRequirements.ToHashSet(),
+                regionRequirements.ToHashSet(),
                 stateModifiers.ToList());
 
             Connect([branch], target);

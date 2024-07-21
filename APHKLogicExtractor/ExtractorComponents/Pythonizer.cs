@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
@@ -6,18 +8,22 @@ namespace APHKLogicExtractor.ExtractorComponents
 {
     internal class Pythonizer
     {
-        private string PascalToSnakeCase(string pascalCase)
-        {
-            return string.Concat(pascalCase.Select((x, i) => i > 0 && char.IsUpper(x) ? $"_{x}" : x.ToString())).ToLower();
-        }
-
         public void Write<T>(T obj, TextWriter writer)
         {
             if (obj == null)
             {
                 throw new ArgumentNullException(nameof(obj));
             }
-            JObject root = JObject.FromObject(obj);
+            IContractResolver contractResolver = new DefaultContractResolver()
+            {
+                NamingStrategy = new SnakeCaseNamingStrategy()
+            };
+            JsonSerializer serializer = new()
+            {
+                ContractResolver = contractResolver,
+                Formatting = Formatting.Indented,
+            };
+            JObject root = JObject.FromObject(obj, serializer);
 
             writer.WriteLine("# This file is programmatically generated, do not modify by hand");
             writer.WriteLine();
@@ -36,7 +42,7 @@ namespace APHKLogicExtractor.ExtractorComponents
             {
                 return;
             }
-            writer.Write($"{PascalToSnakeCase(key)} = ");
+            writer.Write($"{key} = ");
             WriteUnknownToken(value, writer, 0);
         }
 
@@ -99,7 +105,7 @@ namespace APHKLogicExtractor.ExtractorComponents
         {
             WriteContainer<KeyValuePair<string, JToken?>>(obj, writer, indentation, '{', '}', item =>
             {
-                WriteString(PascalToSnakeCase(item.Key), writer);
+                WriteString(item.Key, writer);
                 writer.Write(": ");
                 WriteUnknownToken(item.Value, writer, indentation + 1);
             });
