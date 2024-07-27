@@ -3,17 +3,45 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace APHKLogicExtractor.ExtractorComponents
 {
-    internal class Pythonizer
+    internal partial class Pythonizer
     {
-        public void WriteEnums(IEnumerable<(string name, IEnumerable<string> enumValues)> enums, TextWriter writer)
+        [GeneratedRegex(@"[^A-Z0-9_]")]
+        private static partial Regex BadNameCharFinder();
+
+        [GeneratedRegex(@"_+")]
+        private static partial Regex DoubleUnderscoreFinder();
+
+        public void WriteEnum(string name, IEnumerable<string> values, TextWriter writer)
         {
             WriteHeader(writer);
 
-            writer.WriteLine("from enum import StrEnum");
+            writer.WriteLine("""
+                try:
+                    from enum import StrEnum
+                except ImportError:
+                    from enum import Enum
+
+                    class StrEnum(str, Enum):
+                        pass
+
+                """);
             writer.WriteLine();
+
+            writer.WriteLine($"class {name}(StrEnum):");
+            foreach (var value in values)
+            {
+                string valueName = value.ToUpperInvariant().Replace("'", "");
+                valueName = BadNameCharFinder().Replace(valueName, "_");
+                valueName = DoubleUnderscoreFinder().Replace(valueName, "_");
+                valueName = valueName.Trim('_');
+                valueName = valueName.TrimStart("0123456789".ToArray());
+
+                writer.WriteLine($"    {valueName} = {JsonConvert.SerializeObject(value)}");
+            }
         }
 
         public void Write<T>(T obj, TextWriter writer)

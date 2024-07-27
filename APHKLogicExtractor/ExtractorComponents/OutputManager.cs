@@ -9,23 +9,26 @@ namespace APHKLogicExtractor.ExtractorComponents
     {
         private CommandLineOptions options = optionsService.Value;
 
-        private void EnsureOutputPath()
+        private void EnsureOutputPath(string outputFullPath)
         {
-            Directory.CreateDirectory(options.Output);
+            string dir = Path.GetDirectoryName(outputFullPath);
+            Directory.CreateDirectory(dir);
         }
 
         public Stream CreateOutputFile(string name)
         {
-            EnsureOutputPath();
+            string fullPath = Path.Combine(options.Output, name);
+            EnsureOutputPath(fullPath);
             logger.LogDebug("Creating output file: {}", name);
-            return File.Create(Path.Combine(options.Output, name));
+            return File.Create(fullPath);
         }
 
         public StreamWriter CreateOuputFileText(string name)
         {
-            EnsureOutputPath();
+            string fullPath = Path.Combine(options.Output, name);
+            EnsureOutputPath(fullPath);
             logger.LogDebug("Creating output file: {}", name);
-            return File.CreateText(Path.Combine(options.Output, name));
+            return File.CreateText(fullPath);
         }
     }
 }
