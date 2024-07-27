@@ -23,14 +23,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
         public void AddOrUpdateLogicObject(LogicObjectDefinition logicObject, LogicManager? lm)
         {
             Region r = regions.GetValueOrDefault(logicObject.Name) ?? AddRegion(logicObject.Name);
-            if (logicObject.Name == "Mines_10")
-            {
-
-            }
             if (logicObject.Handling == LogicHandling.Location)
             {
                 r.Locations.Add(logicObject.Name);
-                AddLocation(logicObject.Name);
+                AddLocation(logicObject.Name, logicObject.IsEventLocation);
             }
             RandomizableTransition? t = null;
             if (logicObject.Handling == LogicHandling.Transition)
@@ -134,9 +130,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return r;
         }
 
-        private GraphLocation AddLocation(string locationName)
+        private GraphLocation AddLocation(string locationName, bool isEvent)
         {
-            GraphLocation l = new(locationName, [new RequirementBranch([], [], [], [])]);
+            GraphLocation l = new(locationName, [new RequirementBranch([], [], [], [])], isEvent);
             locations.Add(locationName, l);
             return l;
         }

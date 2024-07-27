@@ -28,6 +28,7 @@ internal class StringWorldCompositor(
         foreach (LogicDef logic in lm.LogicLookup.Values)
         {
             LogicHandling handling;
+            bool isEvent = false;
             if (lm.TransitionLookup.ContainsKey(logic.Name))
             {
                 handling = LogicHandling.Transition;
@@ -36,13 +37,14 @@ internal class StringWorldCompositor(
             {
                 bool stateless = wp.term.Type != TermType.State;
                 handling = stateless ? LogicHandling.Location : LogicHandling.Default;
+                isEvent = stateless;
             }
             else
             {
                 handling = LogicHandling.Location;
             }
             List<StatefulClause> clauses = GetDnfClauses(lm, logic.Name);
-            objects.Add(new LogicObjectDefinition(logic.Name, clauses, handling));
+            objects.Add(new LogicObjectDefinition(logic.Name, clauses, handling, isEvent));
         }
 
         return new StringWorldDefinition(objects, lm);
@@ -100,7 +102,7 @@ internal class StringWorldCompositor(
         {
             List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, waypoint.name);
             LogicHandling handling = waypoint.stateless ? LogicHandling.Location : LogicHandling.Default;
-            objects.Add(new LogicObjectDefinition(waypoint.name, clauses, handling));
+            objects.Add(new LogicObjectDefinition(waypoint.name, clauses, handling, waypoint.stateless));
         }
         foreach (RawLogicDef transition in transitionLogic)
         {

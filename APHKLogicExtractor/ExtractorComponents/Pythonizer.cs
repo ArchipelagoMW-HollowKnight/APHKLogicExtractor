@@ -8,6 +8,14 @@ namespace APHKLogicExtractor.ExtractorComponents
 {
     internal class Pythonizer
     {
+        public void WriteEnums(IEnumerable<(string name, IEnumerable<string> enumValues)> enums, TextWriter writer)
+        {
+            WriteHeader(writer);
+
+            writer.WriteLine("from enum import StrEnum");
+            writer.WriteLine();
+        }
+
         public void Write<T>(T obj, TextWriter writer)
         {
             if (obj == null)
@@ -22,18 +30,23 @@ namespace APHKLogicExtractor.ExtractorComponents
             {
                 ContractResolver = contractResolver,
                 Formatting = Formatting.Indented,
+                DefaultValueHandling = DefaultValueHandling.Ignore,
             };
             JObject root = JObject.FromObject(obj, serializer);
 
-            writer.WriteLine("# This file is programmatically generated, do not modify by hand");
-            writer.WriteLine();
-            writer.WriteLine();
+            WriteHeader(writer);
 
             foreach (var (key, value) in root)
             {
                 WriteRootObject(key, value, writer);
                 writer.WriteLine();
             }
+        }
+
+        private void WriteHeader(TextWriter writer)
+        {
+            writer.WriteLine("# This file is programmatically generated, do not modify by hand");
+            writer.WriteLine();
         }
 
         private void WriteRootObject(string? key, JToken? value, TextWriter writer)

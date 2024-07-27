@@ -15,7 +15,8 @@ namespace APHKLogicExtractor.DataModel
     internal record LogicObjectDefinition(
         string Name,
         IEnumerable<StatefulClause> Logic,
-        LogicHandling Handling = LogicHandling.Default);
+        LogicHandling Handling = LogicHandling.Default,
+        bool IsEventLocation = false);
 
     internal record StringWorldDefinition(IEnumerable<LogicObjectDefinition> LogicObjects, LogicManager? BackingLm = null);
 
