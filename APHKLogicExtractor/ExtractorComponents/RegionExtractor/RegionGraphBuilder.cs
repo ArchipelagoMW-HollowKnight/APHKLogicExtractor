@@ -385,8 +385,8 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 return false;
             }
 
-            // if the region has any exits it is not safe to merge destructively in this manner
-            if (child.Exits.Count != 0)
+            // if the region has any exits or transitions, it is not safe to merge in this manner
+            if (child.Exits.Count != 0 || child.Transitions.Count != 0)
             {
                 return false;
             }
