@@ -1,4 +1,4 @@
-﻿namespace APHKLogicExtractor.DataModel
+﻿namespace APHKLogicExtractor.DataModel.RegionExtractor
 {
     internal record RandomizableTransition(
         string Name,

@@ -1,11 +1,9 @@
 ﻿using APHKLogicExtractor.DataModel;
-using APHKLogicExtractor.Loader;
 using DotNetGraph.Compilation;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using RandomizerCore.Json;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {

@@ -1,6 +1,4 @@
 ﻿using APHKLogicExtractor.DataModel;
-using Microsoft.Extensions.Options;
-using RandomizerCore.Json;
 using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor

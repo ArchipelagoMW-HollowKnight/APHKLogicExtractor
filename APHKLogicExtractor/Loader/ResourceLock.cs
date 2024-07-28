@@ -24,13 +24,19 @@ public class ResourceLock<T>(T resource)
             get
             {
                 if (this.resourceLock == null)
+                {
                     throw new InvalidOperationException("Read from released lock");
+                }
+
                 return this.resourceLock.resource;
             }
             set
             {
                 if (this.resourceLock == null)
+                {
                     throw new InvalidOperationException("Write into released lock");
+                }
+
                 this.resourceLock.resource = value;
             }
         }

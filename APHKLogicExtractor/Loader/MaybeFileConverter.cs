@@ -1,7 +1,5 @@
-using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RandomizerCore.Json;
 
 namespace APHKLogicExtractor.Loader;
 
@@ -36,7 +34,10 @@ internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
             object? instance = Activator.CreateInstance(objectType);
             objectType.GetProperty(nameof(MaybeFile<object>.Content))?.SetValue(instance, deserialized);
             if (innerType == typeof(JToken))
+            {
                 objectType.GetProperty(nameof(MaybeFile<object>.Serializer))?.SetValue(instance, serializer);
+            }
+
             return instance;
         }
 
@@ -90,7 +91,9 @@ internal class MaybeFile<T> where T : class
         }
 
         if (this.Content is U content)
+        {
             return content;
+        }
 
         throw new InvalidCastException($"Unable to cast content to the given type: {typeof(U)} from {this.Content?.GetType().ToString() ?? "null"}");
     }

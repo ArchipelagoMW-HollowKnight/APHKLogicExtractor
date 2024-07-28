@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace APHKLogicExtractor.DataModel
+namespace APHKLogicExtractor.DataModel.RandomizerData
 {
     [JsonConverter(typeof(StringEnumConverter))]
     public enum Direction

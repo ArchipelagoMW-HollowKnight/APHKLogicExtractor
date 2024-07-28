@@ -11,7 +11,7 @@ namespace APHKLogicExtractor.ExtractorComponents
 
         private void EnsureOutputPath(string outputFullPath)
         {
-            string dir = Path.GetDirectoryName(outputFullPath);
+            string dir = Path.GetDirectoryName(outputFullPath) ?? options.Output;
             Directory.CreateDirectory(dir);
         }
 

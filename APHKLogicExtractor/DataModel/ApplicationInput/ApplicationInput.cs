@@ -2,7 +2,6 @@ using APHKLogicExtractor.Loader;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
-using RandomizerCore.Json.Converters;
 
 namespace APHKLogicExtractor.DataModel;
 

@@ -2,12 +2,10 @@ using APHKLogicExtractor.DataModel;
 using APHKLogicExtractor.Loader;
 using APHKLogicExtractor.RC;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RandomizerCore.Json;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
-using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents;
 
@@ -43,7 +41,7 @@ internal class StringWorldCompositor(
             {
                 handling = LogicHandling.Location;
             }
-            List<StatefulClause> clauses = GetDnfClauses(lm, logic.Name);
+            List<StatefulClause> clauses = RcUtils.GetDnfClauses(lm, logic.Name);
             objects.Add(new LogicObjectDefinition(logic.Name, clauses, handling, isEvent));
         }
 
@@ -56,23 +54,40 @@ internal class StringWorldCompositor(
         JsonLogicConfiguration configuration = await input.GetContent<JsonLogicConfiguration>();
         Dictionary<string, List<string>> rawTerms = [];
         if (configuration.Logic?.Terms != null)
+        {
             rawTerms = await configuration.Logic.Terms.GetContent();
-        TermCollectionBuilder terms = RC.Utils.AssembleTerms(rawTerms);
+        }
+
+        TermCollectionBuilder terms = RC.RcUtils.AssembleTerms(rawTerms);
         RawStateData stateData = new();
         if (configuration?.Logic?.State != null)
+        {
             stateData = await configuration.Logic.State.GetContent();
+        }
+
         List<RawLogicDef> transitionLogic = [];
         if (configuration?.Logic?.Transitions != null)
+        {
             transitionLogic = await configuration.Logic.Transitions.GetContent();
+        }
+
         List<RawLogicDef> locationLogic = [];
         if (configuration?.Logic?.Locations != null)
+        {
             locationLogic = await configuration.Logic.Locations.GetContent();
+        }
+
         Dictionary<string, string> macroLogic = [];
         if (configuration?.Logic?.Macros != null)
+        {
             macroLogic = await configuration.Logic.Macros.GetContent();
+        }
+
         List<RawWaypointDef> waypointLogic = [];
         if (configuration?.Logic?.Waypoints != null)
+        {
             waypointLogic = await configuration.Logic.Waypoints.GetContent();
+        }
 
         logger.LogInformation("Preparing logic manager");
         LogicManagerBuilder preprocessorLmb = new() { VariableResolver = new DummyVariableResolver() };
@@ -100,44 +115,21 @@ internal class StringWorldCompositor(
         // add waypoints to the region list first since they usually have better names after merging
         foreach (RawWaypointDef waypoint in waypointLogic)
         {
-            List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, waypoint.name);
+            List<StatefulClause> clauses = RcUtils.GetDnfClauses(preprocessorLm, waypoint.name);
             LogicHandling handling = waypoint.stateless ? LogicHandling.Location : LogicHandling.Default;
             objects.Add(new LogicObjectDefinition(waypoint.name, clauses, handling, waypoint.stateless));
         }
         foreach (RawLogicDef transition in transitionLogic)
         {
-            List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, transition.name);
+            List<StatefulClause> clauses = RcUtils.GetDnfClauses(preprocessorLm, transition.name);
             objects.Add(new LogicObjectDefinition(transition.name, clauses, LogicHandling.Transition));
         }
         foreach (RawLogicDef location in locationLogic)
         {
-            List<StatefulClause> clauses = GetDnfClauses(preprocessorLm, location.name);
+            List<StatefulClause> clauses = RcUtils.GetDnfClauses(preprocessorLm, location.name);
             objects.Add(new LogicObjectDefinition(location.name, clauses, LogicHandling.Location));
         }
 
         return new StringWorldDefinition(objects, preprocessorLm);
-    }
-
-    private List<StatefulClause> GetDnfClauses(LogicManager lm, string name)
-    {
-        LogicDef def = lm.GetLogicDefStrict(name);
-        if (def is not DNFLogicDef dd)
-        {
-            logger.LogWarning("Logic definition for {} was not available in DNF form, creating", def.Name);
-            dd = lm.CreateDNFLogicDef(def.Name, def.ToLogicClause());
-        }
-        return GetDnfClauses(lm, dd);
-    }
-
-    private static List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd)
-    {
-        // remove FALSE clauses, and remove TRUE from all clauses
-        IEnumerable<IEnumerable<TermToken>> clauses = dd.ToTermTokenSequences()
-            .Where(x => !x.Contains(ConstToken.False));
-        if (!clauses.Any())
-        {
-            return [new StatefulClause(null, new HashSet<TermToken>(1) { ConstToken.False }, [])];
-        }
-        return clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True))).ToList();
     }
 }

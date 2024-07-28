@@ -1,5 +1,5 @@
+using APHKLogicExtractor.DataModel.RandomizerData;
 using APHKLogicExtractor.Loader;
-using Newtonsoft.Json;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;

@@ -1,4 +1,4 @@
-﻿namespace APHKLogicExtractor.DataModel
+﻿namespace APHKLogicExtractor.DataModel.RandomizerData
 {
     internal record RoomDef
     {

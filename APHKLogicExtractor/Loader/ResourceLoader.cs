@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using RandomizerCore.Json;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace APHKLogicExtractor.Loader;
 
@@ -53,9 +53,18 @@ internal class ResourceLoader(IOptions<CommandLineOptions> options, ILogger<Reso
             string[] split = path.Split("://");
             if (split.Length == 2)
             {
-                if (split[0].StartsWith("http")) data = await this.GetHttp(path);
-                else if (split[0] == "file") data = await File.ReadAllBytesAsync(split[1]);
-                else throw new InvalidOperationException("Unsupported resource protocol");
+                if (split[0].StartsWith("http"))
+                {
+                    data = await this.GetHttp(path);
+                }
+                else if (split[0] == "file")
+                {
+                    data = await File.ReadAllBytesAsync(split[1]);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unsupported resource protocol");
+                }
             }
             else
             {

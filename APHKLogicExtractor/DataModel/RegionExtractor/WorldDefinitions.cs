@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using APHKLogicExtractor.DataModel.RegionExtractor;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using RandomizerCore.Logic;
 
