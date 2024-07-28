@@ -39,7 +39,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             {
                 string parentName = GetRegionName(clause.StateProvider);
                 Region parent = regions.GetValueOrDefault(parentName) ?? AddRegion(parentName);
-                var (itemReqs, locationReqs, regionReqs) = PartitionRequirements(clause.Conditions, lm);
+                var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
 
                 if (logicObject.Handling == LogicHandling.Transition && parent == r)
                 {
@@ -152,53 +152,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             ReferenceToken rt => rt.Target,
             _ => throw new InvalidOperationException($"Tokens of type {token.GetType().FullName} are not valid region parents")
         };
-
-        private (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs) PartitionRequirements(
-            IEnumerable<TermToken> reqs,
-            LogicManager? lm
-        )
-        {
-            HashSet<string> items = new HashSet<string>();
-            HashSet<string> locations = new HashSet<string>();
-            HashSet<string> regions = new HashSet<string>();
-            foreach (TermToken t in reqs)
-            {
-                if (t is ReferenceToken rt)
-                {
-                    locations.Add(rt.Target);
-                }
-                else if (t is ProjectedToken pt)
-                {
-                    if (pt.Inner is ReferenceToken rtt)
-                    {
-                        locations.Add(rtt.Target);
-                    }
-                    else
-                    {
-                        regions.Add(pt.Inner.Write());
-                    }
-                }
-                else
-                {
-                    // bug workaround - at the time of writing, projection tokens are flattened by RC
-                    // so we have to semantically check our item requirements to see if they should have been projected
-                    string token = t.Write();
-                    if (lm != null && lm.GetTransition(token) != null)
-                    {
-                        regions.Add(token);
-                    }
-                    else if (lm != null && lm.Waypoints.Any(w => w.Name == token && w.term.Type == TermType.State))
-                    {
-                        regions.Add(token);
-                    }
-                    else 
-                    {
-                        items.Add(token);
-                    }
-                }
-            }
-            return (items, locations, regions);
-        }
 
         private void Validate()
         {

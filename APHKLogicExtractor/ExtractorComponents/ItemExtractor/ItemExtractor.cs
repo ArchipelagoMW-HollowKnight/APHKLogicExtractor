@@ -1,8 +1,10 @@
 ﻿using APHKLogicExtractor.DataModel;
+using APHKLogicExtractor.DataModel.ItemExtractor;
 using APHKLogicExtractor.RC;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using RandomizerCore;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
@@ -15,7 +17,6 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
         ApplicationInput input,
         ILogger<ItemExtractor> logger,
         IOptions<CommandLineOptions> optionsService,
-        StringWorldCompositor stringWorldCompositor,
         Pythonizer pythonizer,
         OutputManager outputManager) : BackgroundService
     {
@@ -46,7 +47,7 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                 rawTerms = await configuration.Logic.Terms.GetContent();
             }
 
-            TermCollectionBuilder terms = RC.RcUtils.AssembleTerms(rawTerms);
+            TermCollectionBuilder terms = RcUtils.AssembleTerms(rawTerms);
             RawStateData stateData = new();
             if (configuration?.Logic?.State != null)
             {
@@ -109,29 +110,112 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             }
             LogicManager lm = new(preprocessorLmb);
 
+            logger.LogInformation("Processing item effects");
+            HashSet<string> ignoredTerms = [];
+            if (input.IgnoredTerms != null)
+            {
+                ignoredTerms = await input.IgnoredTerms.GetContent();
+            }
+            HashSet<string> ignoredItems = [];
+            if (input.IgnoredItems != null)
+            {
+                ignoredItems = await input.IgnoredItems.GetContent();
+            }
+            Dictionary<string, IItemEffect> progEffects = new();
+            List<string> nonProgItems = [];
             foreach (LogicItem li in lm.ItemLookup.Values)
             {
+                if (ignoredItems.Contains(li.Name))
+                {
+                    continue;
+                }
+
                 if (li is not StringItem si)
                 {
                     throw new NotImplementedException("Unrecognized item type");
                 }
-                logger.LogInformation("{}: {} (from {})", si.Name, StringifyEffect(si.Effect), si.EffectString);
+                IItemEffect? effect = ConvertAndSimplifyEffect(lm, si.Effect, ignoredTerms);
+                if (effect == null)
+                {
+                    nonProgItems.Add(li.Name);
+                }
+                else
+                {
+                    progEffects[li.Name] = effect;
+                }
             }
+
+            logger.LogInformation("Beginning final output");
+            ItemData data = new(progEffects, nonProgItems);
+            using (StreamWriter writer = outputManager.CreateOuputFileText("items.json"))
+            {
+                using (JsonTextWriter jtw = new(writer))
+                {
+                    JsonSerializer ser = new()
+                    {
+                        Formatting = Formatting.Indented,
+                    };
+                    ser.Serialize(jtw, data);
+                }
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("item_data.py"))
+            {
+                pythonizer.Write(data, writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/item_names.py"))
+            {
+                pythonizer.WriteEnum("LocationNames",
+                    progEffects.Keys.Concat(nonProgItems),
+                    writer);
+            }
+            logger.LogInformation("Successfully exported {} progression items and {} non-progression items",
+                progEffects.Count,
+                nonProgItems.Count);
         }
 
-        private string StringifyEffect(StringItemEffect effect)
+        private IItemEffect? ConvertAndSimplifyEffect(LogicManager lm, StringItemEffect effect, HashSet<string> ignoredTerms)
         {
-            return effect switch
+            if (effect is ConditionalEffect ce && ce.Logic is DNFLogicDef dd)
             {
-                EmptyEffect => "No effect",
-                AllOfEffect ae => string.Join(" AND ", ((StringItemEffect[])AllOfEffect_Effects.GetValue(ae)!).Select(StringifyEffect)),
-                FirstOfEffect fe => string.Join(" ELSE ", ((StringItemEffect[])FirstOfEffect_Effects.GetValue(fe)!).Select(StringifyEffect)),
-                IncrementEffect ie => $"add {ie.Value} to {ie.Term.Name}",
-                MaxWithEffect me => $"set {me.Term.Name} no smaller than {me.Value}",
-                ConditionalEffect ce => $"if `{ce.Logic.InfixSource}` is {(ce.Negated ? "true" : "false")}, then {{{StringifyEffect(ce.Effect)}}}",
-                ReferenceEffect re when re.Item is StringItem ri => StringifyEffect(ri.Effect),
+                List<StatefulClause> clauses = RcUtils.GetDnfClauses(lm, dd);
+                List<RequirementBranch> branches = [];
+                foreach (StatefulClause clause in clauses)
+                {
+                    if (clause.StateProvider != null || clause.StateModifiers.Count > 0)
+                    {
+                        throw new NotImplementedException("Stateful item effects are not yet supported");
+                    }
+                    var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
+                    branches.Add(new RequirementBranch(itemReqs, locationReqs, regionReqs, []));
+                }
+                IItemEffect? simplified = ConvertAndSimplifyEffect(lm, ce.Effect, ignoredTerms);
+                if (simplified == null)
+                {
+                    return null; 
+                }
+                return new ConditionedEffect(branches, ce.Negated, simplified);
+            }
+            // MaxWithEffect intentionally not supported, as it is probably unsafe. Can be revisited in the future.
+            IItemEffect? result = effect switch
+            {
+                EmptyEffect => null,
+                AllOfEffect ae => new MultiEffect(((StringItemEffect[])AllOfEffect_Effects.GetValue(ae)!)
+                    .Select(e => ConvertAndSimplifyEffect(lm, e, ignoredTerms)!)
+                    .Where(e => e != null)
+                    .ToList()),
+                FirstOfEffect fe => new BranchingEffect(((StringItemEffect[])FirstOfEffect_Effects.GetValue(fe)!)
+                    .Select(e => ConvertAndSimplifyEffect(lm, e, ignoredTerms)!)
+                    .Where(e => e != null)
+                    .ToList()),
+                IncrementEffect ie when ignoredTerms.Contains(ie.Term.Name) => null,
+                IncrementEffect ie => new IncrementTermsEffect(new()
+                {
+                    [ie.Term.Name] = ie.Value,
+                }),
+                ReferenceEffect re when re.Item is StringItem ri => ConvertAndSimplifyEffect(lm, ri.Effect, ignoredTerms),
                 _ => throw new NotImplementedException("Unrecognized effect")
             };
+            return result?.Simplify();
         }
     }
 }

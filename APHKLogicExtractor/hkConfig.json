@@ -1,25 +1,49 @@
 {
-    "type": "JsonLogic",
-    "configuration": {
-        "data": {
-            "rooms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/rooms.json",
-            "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/locations.json",
-            "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/transitions.json"
-        },
-        "logic": {
-            "terms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/terms.json",
-            "state": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/state.json",
-            "macros": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/macros.json",
-            "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/transitions.json",
-            "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/locations.json",
-            "waypoints": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/waypoints.json",
-            "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/items.json"
-        }
+  "type": "JsonLogic",
+  "configuration": {
+    "data": {
+      "rooms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/rooms.json",
+      "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/locations.json",
+      "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/transitions.json"
     },
-    "startStateTerm": "Start_State",
-    "classifierModel": "./hkStateConfig.json",
-    "emptyRegionsToKeep": [
-        "Can_Stag",
-        "Can_Bench"
-    ]
+    "logic": {
+      "terms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/terms.json",
+      "state": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/state.json",
+      "macros": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/macros.json",
+      "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/transitions.json",
+      "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/locations.json",
+      "waypoints": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/waypoints.json",
+      "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/items.json"
+    }
+  },
+  "startStateTerm": "Start_State",
+  "classifierModel": "./hkStateConfig.json",
+  "emptyRegionsToKeep": [
+    "Can_Stag",
+    "Can_Bench"
+  ],
+  "ignoredTerms": [
+    "GEO",
+    "JOURNAL",
+    "QUILL",
+    "MAPS",
+    "Crossroads_Map",
+    "Greenpath_Map",
+    "Fog_Canyon_Map",
+    "Fungal_Wastes_Map",
+    "Deepnest_Map",
+    "Ancient_Basin_Map",
+    "Kingdom's_Edge_Map",
+    "City_of_Tears_Map",
+    "Royal_Waterways_Map",
+    "Howling_Cliffs_Map",
+    "Crystal_Peak_Map",
+    "Queen's_Gardens_Map",
+    "Resting_Grounds_Map",
+    "Collector's_Map"
+  ],
+  "ignoredItems": [
+    "Split_Shade_Cloak",
+    "Dreamer"
+  ]
 }

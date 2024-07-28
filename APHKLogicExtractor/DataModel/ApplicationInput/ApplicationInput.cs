@@ -15,6 +15,8 @@ public enum InputType
 
 internal record ApplicationInput
 {
+    ///// Region extractor properties /////
+    
     [JsonProperty(Required = Required.Always)]
     public InputType Type { get; set; }
     // JsonLogic => JsonLogicConfiguration
@@ -25,4 +27,9 @@ internal record ApplicationInput
     public string? StartStateTerm { get; set; }
     public MaybeFile<StateClassificationModel>? ClassifierModel { get; set; }
     public MaybeFile<HashSet<string>>? EmptyRegionsToKeep { get; set; }
+
+    ///// Item extractor properties /////
+
+    public MaybeFile<HashSet<string>>? IgnoredTerms { get; set; }
+    public MaybeFile<HashSet<string>>? IgnoredItems { get; set; }
 }

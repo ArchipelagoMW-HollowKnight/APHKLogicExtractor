@@ -143,5 +143,52 @@ namespace APHKLogicExtractor.DataModel
             string inner = string.Join(" + ", ToTokens().Select(x => x.Write()));
             return $"({inner})";
         }
+
+
+
+        public (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs) 
+            PartitionRequirements(LogicManager? lm)
+        {
+            HashSet<string> items = new HashSet<string>();
+            HashSet<string> locations = new HashSet<string>();
+            HashSet<string> regions = new HashSet<string>();
+            foreach (TermToken t in Conditions)
+            {
+                if (t is ReferenceToken rt)
+                {
+                    locations.Add(rt.Target);
+                }
+                else if (t is ProjectedToken pt)
+                {
+                    if (pt.Inner is ReferenceToken rtt)
+                    {
+                        locations.Add(rtt.Target);
+                    }
+                    else
+                    {
+                        regions.Add(pt.Inner.Write());
+                    }
+                }
+                else
+                {
+                    // bug workaround - at the time of writing, projection tokens are flattened by RC
+                    // so we have to semantically check our item requirements to see if they should have been projected
+                    string token = t.Write();
+                    if (lm != null && lm.GetTransition(token) != null)
+                    {
+                        regions.Add(token);
+                    }
+                    else if (lm != null && lm.Waypoints.Any(w => w.Name == token && w.term.Type == TermType.State))
+                    {
+                        regions.Add(token);
+                    }
+                    else
+                    {
+                        items.Add(token);
+                    }
+                }
+            }
+            return (items, locations, regions);
+        }
     }
 }
