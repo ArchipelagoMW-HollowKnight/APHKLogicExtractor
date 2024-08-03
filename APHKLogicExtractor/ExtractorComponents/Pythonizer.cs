@@ -59,6 +59,7 @@ namespace APHKLogicExtractor.ExtractorComponents
                 ContractResolver = contractResolver,
                 Formatting = Formatting.Indented,
                 DefaultValueHandling = DefaultValueHandling.Ignore,
+                ReferenceLoopHandling = ReferenceLoopHandling.Serialize,
             };
             JObject root = JObject.FromObject(obj, serializer);
 

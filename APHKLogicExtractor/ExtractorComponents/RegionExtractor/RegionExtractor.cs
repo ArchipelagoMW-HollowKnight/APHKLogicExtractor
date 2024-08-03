@@ -65,6 +65,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     JsonSerializer ser = new()
                     {
                         Formatting = Formatting.Indented,
+                        ReferenceLoopHandling = ReferenceLoopHandling.Serialize,
                     };
                     ser.Serialize(jtw, world);
                 }
