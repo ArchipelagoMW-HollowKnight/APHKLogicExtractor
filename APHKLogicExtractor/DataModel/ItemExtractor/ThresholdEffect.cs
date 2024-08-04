@@ -11,6 +11,15 @@
     {
         public string Type => "threshold";
 
+        public IReadOnlySet<string> GetAffectedTerms()
+        {
+            return BelowThreshold.Keys
+            .Concat(AtThreshold.Keys)
+            .Concat(AboveThreshold.Keys)
+            .Append(Term)
+            .ToHashSet();
+        }
+
         public static IItemEffect TryConvert(BranchingEffect be)
         {
             if (be.Conditionals.Count == 1 && be.Conditionals[0].Condition.Count == 1

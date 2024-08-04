@@ -4,6 +4,8 @@
     {
         string Type { get; }
 
+        IReadOnlySet<string> GetAffectedTerms();
+
         IItemEffect? Simplify() => this;
     }
 }

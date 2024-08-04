@@ -4,6 +4,14 @@
     {
         public string Type => "branching";
 
+        public IReadOnlySet<string> GetAffectedTerms()
+        {
+            return Conditionals
+            .SelectMany(x => x.GetAffectedTerms())
+            .Concat(Else?.GetAffectedTerms() ?? new HashSet<string>())
+            .ToHashSet();
+        }
+
         public IReadOnlyList<ConditionedEffect> Conditionals { get; }
 
         public IItemEffect? Else { get; }

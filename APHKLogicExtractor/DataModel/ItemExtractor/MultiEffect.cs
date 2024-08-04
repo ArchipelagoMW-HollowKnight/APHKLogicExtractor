@@ -4,6 +4,11 @@
     {
         public string Type => "multiple";
 
+        public IReadOnlySet<string> GetAffectedTerms()
+        {
+            return Effects.SelectMany(x => x.GetAffectedTerms()).ToHashSet();
+        }
+
         public IItemEffect? Simplify()
         {
             Dictionary<string, int> composedTermEffects = new();

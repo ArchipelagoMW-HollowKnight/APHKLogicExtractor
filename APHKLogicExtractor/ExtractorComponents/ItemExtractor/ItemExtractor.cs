@@ -145,8 +145,26 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                 }
             }
 
+            logger.LogInformation("Collecting affected term maps");
+            Dictionary<string, IReadOnlySet<string>> termsByItem = new();
+            Dictionary<string, IReadOnlySet<string>> itemsByTerm = new();
+            foreach (var (name, effect) in progEffects)
+            {
+                IReadOnlySet<string> affectedTerms = effect.GetAffectedTerms();
+                termsByItem[name] = affectedTerms;
+                foreach (string term in affectedTerms)
+                {
+                    if (!itemsByTerm.ContainsKey(term))
+                    {
+                        itemsByTerm[term] = new HashSet<string>();
+                    }
+                    HashSet<string> writable = (HashSet<string>)itemsByTerm[term];
+                    writable.Add(name);
+                }
+            }
+
             logger.LogInformation("Beginning final output");
-            ItemData data = new(progEffects, nonProgItems);
+            ItemData data = new(progEffects, nonProgItems, termsByItem, itemsByTerm);
             using (StreamWriter writer = outputManager.CreateOuputFileText("items.json"))
             {
                 using (JsonTextWriter jtw = new(writer))
