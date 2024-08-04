@@ -208,7 +208,7 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                     .Where(e => e != null)
                     .ToList()),
                 IncrementEffect ie when ignoredTerms.Contains(ie.Term.Name) => null,
-                IncrementEffect ie => new IncrementTermsEffect(new()
+                IncrementEffect ie => new IncrementTermsEffect(new Dictionary<string, int>()
                 {
                     [ie.Term.Name] = ie.Value,
                 }),
