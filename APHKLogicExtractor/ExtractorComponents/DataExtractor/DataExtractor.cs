@@ -203,7 +203,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             PoolData poolData = new(finalPoolOptions, logicOptions);
             LocationData locationData = new(multiLocations);
             TrandoData trandoData = new(transitions, finalStarts);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("pool_data.py"))
+            using (StreamWriter writer = outputManager.CreateOuputFileText("option_data.py"))
             {
                 pythonizer.Write(poolData, writer);
             }
