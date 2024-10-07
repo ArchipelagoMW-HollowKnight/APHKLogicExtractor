@@ -1,6 +1,7 @@
 ﻿using APHKLogicExtractor;
 using APHKLogicExtractor.DataModel;
 using APHKLogicExtractor.ExtractorComponents;
+using APHKLogicExtractor.ExtractorComponents.DataExtractor;
 using APHKLogicExtractor.ExtractorComponents.ItemExtractor;
 using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
 using APHKLogicExtractor.Loader;
@@ -39,6 +40,7 @@ builder.Services.AddSingleton<StringWorldCompositor>();
 
 builder.Services.AddHostedService<RegionExtractor>();
 builder.Services.AddHostedService<ItemExtractor>();
+builder.Services.AddHostedService<DataExtractor>();
 
 IHost host = builder.Build();
 await host.StartAsync();

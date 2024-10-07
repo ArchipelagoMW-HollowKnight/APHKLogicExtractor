@@ -4,7 +4,6 @@ using APHKLogicExtractor.RC;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using RandomizerCore;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
@@ -165,17 +164,6 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
 
             logger.LogInformation("Beginning final output");
             ItemData data = new(progEffects, nonProgItems, termsByItem, itemsByTerm);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("items.json"))
-            {
-                using (JsonTextWriter jtw = new(writer))
-                {
-                    JsonSerializer ser = new()
-                    {
-                        Formatting = Formatting.Indented,
-                    };
-                    ser.Serialize(jtw, data);
-                }
-            }
             using (StreamWriter writer = outputManager.CreateOuputFileText("item_data.py"))
             {
                 pythonizer.Write(data, writer);
@@ -185,6 +173,12 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                 pythonizer.WriteEnum("LocationNames",
                     progEffects.Keys.Concat(nonProgItems),
                     writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/terms.py"))
+            {
+                pythonizer.WriteEnum("Terms", terms.Select(t => t.Name)
+                    .Concat(transitionLogic.Select(t => t.name))
+                    .Concat(waypointLogic.Where(w => w.stateless).Select(w => w.name)), writer);
             }
             logger.LogInformation("Successfully exported {} progression items and {} non-progression items",
                 progEffects.Count,

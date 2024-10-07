@@ -1,0 +1,245 @@
+﻿using APHKLogicExtractor.DataModel;
+using APHKLogicExtractor.DataModel.DataExtractor;
+using APHKLogicExtractor.DataModel.RandomizerData;
+using APHKLogicExtractor.RC;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using RandomizerCore.Logic;
+
+namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
+{
+    internal class DataExtractor(
+        ApplicationInput input,
+        ILogger<DataExtractor> logger,
+        IOptions<CommandLineOptions> optionsService,
+        Pythonizer pythonizer,
+        OutputManager outputManager) : BackgroundService
+    {
+        // these costs are not anywhere in randomizer data so we get to hardcode them
+        private static readonly Dictionary<(string loc, string item), List<CostDef>> ShopGeoCosts = new()
+        {
+            [("Sly", "Simple_Key")] = [new("GEO", 950)],
+            [("Sly", "Rancid_Egg")] = [new("GEO", 60)],
+            [("Sly", "Lumafly_Lantern")] = [new("GEO", 1800)],
+            [("Sly", "Gathering_Swarm")] = [new("GEO", 300)],
+            [("Sly", "Stalwart_Shell")] = [new("GEO", 200)],
+            [("Sly", "Mask_Shard")] = [
+                new("GEO", 150),
+                new("GEO", 500),
+            ],
+            [("Sly", "Vessel_Fragment")] = [new("GEO", 550)],
+
+            [("Sly_(Key)", "Heavy_Blow")] = [new("GEO", 350)],
+            [("Sly_(Key)", "Elegant_Key")] = [new("GEO", 800)],
+            [("Sly_(Key)", "Mask_Shard")] = [
+                new("GEO", 800),
+                new("GEO", 1500),
+            ],
+            [("Sly_(Key)", "Vessel_Fragment")] = [new("GEO", 900)],
+            [("Sly_(Key)", "Sprintmaster")] = [new("GEO", 400)],
+
+            [("Iselda", "Wayward_Compass")] = [new("GEO", 220)],
+            [("Iselda", "Quill")] = [new("GEO", 120)],
+
+            [("Salubra", "Lifeblood_Heart")] = [new("GEO", 250)],
+            [("Salubra", "Longnail")] = [new("GEO", 300)],
+            [("Salubra", "Steady_Body")] = [new("GEO", 120)],
+            [("Salubra", "Shaman_Stone")] = [new("GEO", 220)],
+            [("Salubra", "Quick_Focus")] = [new("GEO", 800)],
+
+            [("Leg_Eater", "Fragile_Heart")] = [new("GEO", 350)],
+            [("Leg_Eater", "Fragile_Greed")] = [new("GEO", 250)],
+            [("Leg_Eater", "Fragile_Strength")] = [new("GEO", 600)],
+        };
+        private static readonly Dictionary<int, int> SalubraGeoCostsByCharmCount = new()
+        {
+            [5] = 120,
+            [10] = 500,
+            [18] = 900,
+            [25] = 1400,
+            [40] = 800,
+        };
+        private static readonly string[] TrandoSettingsTerms =
+        [
+            "ITEMRANDO",
+            "MAPAREARANDO",
+            "FULLAREARANDO",
+            "AREARANDO",
+            "ROOMRANDO",
+            "SWIM",
+            "ELEVATOR",
+            "2MASKS",
+            "VERTICAL"
+        ];
+
+        private CommandLineOptions options = optionsService.Value;
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            logger.LogInformation("Validating options");
+
+            if (options.Jobs.Any() && !options.Jobs.Contains(JobType.ExtractData))
+            {
+                logger.LogInformation("Job not requested, skipping");
+                return;
+            }
+
+            logger.LogInformation("Beginning data extraction");
+            JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
+
+            logger.LogInformation("Collecting pool and cost information");
+            List<PoolDef> pools = [];
+            Dictionary<string, CostDef> vanillaLocationCosts = [];
+            Dictionary<string, string> logicOptions = [];
+            if (configuration.Data?.Pools != null)
+            {
+                pools = await configuration.Data.Pools.GetContent();
+            }
+            if (configuration.Data?.Costs != null)
+            {
+                vanillaLocationCosts = await configuration.Data.Costs.GetContent();
+            }
+            if (configuration.Data?.LogicSettings != null)
+            {
+                logicOptions = await configuration.Data.LogicSettings.GetContent();
+            }
+            Dictionary<(string loc, string item), int> usedCostsByItemLocationPair = new();
+            Dictionary<string, List<VanillaDef>> finalPoolOptions = new();
+            string optionName = "";
+            foreach (PoolDef pool in pools)
+            {
+                if (pool.Path.ToLowerInvariant() != "false")
+                {
+                    // inject vanilla costs
+                    foreach (VanillaDef vanilla in pool.Vanilla)
+                    {
+                        List<CostDef> costsToAdd = [];
+                        // ISCP geo costs
+                        if (vanillaLocationCosts.TryGetValue(vanilla.Location, out CostDef? cd) && cd.Term == "GEO" && cd.Amount > 0)
+                        {
+                            costsToAdd.Add(cd);
+                        }
+                        // shop geo costs
+                        var itemLocationPair = (vanilla.Location, vanilla.Item);
+                        int i = usedCostsByItemLocationPair.GetValueOrDefault(itemLocationPair, 0);
+                        if (ShopGeoCosts.TryGetValue(itemLocationPair, out List<CostDef>? costs) 
+                            && i < costs.Count)
+                        {
+                            costsToAdd.Add(costs[i++]);
+                            usedCostsByItemLocationPair[itemLocationPair] = i;
+                        }
+                        // salubra charm notch geo costs
+                        CostDef? charmCost = vanilla.Costs?.FirstOrDefault(c => c.Term == "CHARMS");
+                        if (vanilla.Location == "Salubra" && charmCost != null)
+                        {
+                            costsToAdd.Add(new CostDef("GEO", SalubraGeoCostsByCharmCount[charmCost.Amount]));
+                        }
+
+                        if (costsToAdd.Count > 0)
+                        {
+                            vanilla.Costs ??= [];
+                            vanilla.Costs.AddRange(costsToAdd);
+                        }
+                    }
+                    // get the corresponding option name, or inherit the last one if not provided
+                    if (pool.Path != "")
+                    {
+                        optionName = GetOptionName(pool.Path, "Randomize");
+                    }
+
+                    if (pool.Vanilla.Count > 0)
+                    {
+                        if (!finalPoolOptions.ContainsKey(optionName))
+                        {
+                            finalPoolOptions[optionName] = [];
+                        }
+                        finalPoolOptions[optionName].AddRange(pool.Vanilla);
+                    }
+                }
+            }
+            logicOptions = logicOptions.ToDictionary(kv => kv.Key, kv => GetOptionName(kv.Value, ""));
+
+            logger.LogInformation("Collecting multi location data");
+            List<string> multiLocations = [];
+            if (configuration.Data?.Locations != null)
+            {
+                Dictionary<string, LocationDef> locations = await configuration.Data.Locations.GetContent();
+                multiLocations.AddRange(locations.Values.Where(l => l.FlexibleCount).Select(l => l.Name));
+            }
+
+            logger.LogInformation("Collecting trando and start data");
+            Dictionary<string, TransitionDef> transitions = [];
+            Dictionary<string, StartDef> starts = [];
+            Dictionary<string, StartData> finalStarts = [];
+            if (configuration.Data?.Transitions != null)
+            {
+                transitions = await configuration.Data.Transitions.GetContent();
+            }
+            if (configuration.Data?.Starts != null)
+            {
+                starts = await configuration.Data.Starts.GetContent();
+            }
+            // transform start data and parse out logic
+            LogicManager lm = GetSettingsLogicManager(logicOptions.Keys);
+            foreach (StartDef start in starts.Values)
+            {
+                DNFLogicDef logic = lm.CreateDNFLogicDef(new RawLogicDef(start.Name, start.Logic));
+                List<StatefulClause> clauses = RcUtils.GetDnfClauses(lm, logic);
+                List<RequirementBranch> finalLogic = [];
+                foreach (StatefulClause clause in clauses)
+                {
+                    // these can't be stateful so the conversion to branches is easy
+                    var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
+                    if (itemReqs.Count > 0 || locationReqs.Count > 0 || regionReqs.Count > 0)
+                    {
+                        finalLogic.Add(new RequirementBranch(itemReqs, locationReqs, regionReqs, []));
+                    }
+                }
+                finalStarts.Add(start.Name.ToLowerInvariant().Replace(' ', '_'), new StartData(start.Name, start.Transition, finalLogic));
+            }
+
+            logger.LogInformation("Beginning final output");
+            PoolData poolData = new(finalPoolOptions, logicOptions);
+            LocationData locationData = new(multiLocations);
+            TrandoData trandoData = new(transitions, finalStarts);
+            using (StreamWriter writer = outputManager.CreateOuputFileText("pool_data.py"))
+            {
+                pythonizer.Write(poolData, writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("location_data.py"))
+            {
+                pythonizer.Write(locationData, writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("trando_data.py"))
+            {
+                pythonizer.Write(trandoData, writer);
+            }
+
+            logger.LogInformation("Successfully extracted non-logic data");
+        }
+
+        private string GetOptionName(string path, string prefix)
+        {
+            string basename = path.Split('.')[^1];
+            if (!basename.StartsWith(prefix))
+            {
+                basename = prefix + basename;
+            }
+            return basename;
+        }
+
+        private LogicManager GetSettingsLogicManager(IEnumerable<string> logicOptionTerms)
+        {
+            logger.LogInformation("Preparing settings logic manager");
+
+            LogicManagerBuilder lmb = new();
+            foreach (string term in logicOptionTerms.Concat(TrandoSettingsTerms))
+            {
+                lmb.GetOrAddTerm(term, TermType.SignedByte);
+            }
+
+            return new LogicManager(lmb);
+        }
+    }
+}

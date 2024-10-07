@@ -3,7 +3,6 @@ using DotNetGraph.Compilation;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
@@ -58,18 +57,6 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 regionsToKeep = await input.EmptyRegionsToKeep.GetContent();
             }
             GraphWorldDefinition world = builder.Build(stateClassifier, regionsToKeep);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("regions.json"))
-            {
-                using (JsonTextWriter jtw = new(writer))
-                {
-                    JsonSerializer ser = new()
-                    {
-                        Formatting = Formatting.Indented,
-                        ReferenceLoopHandling = ReferenceLoopHandling.Serialize,
-                    };
-                    ser.Serialize(jtw, world);
-                }
-            }
             using (StreamWriter writer = outputManager.CreateOuputFileText("region_data.py"))
             {
                 pythonizer.Write(world, writer);

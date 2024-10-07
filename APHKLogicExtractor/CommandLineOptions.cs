@@ -5,7 +5,8 @@ namespace APHKLogicExtractor
     public enum JobType
     {
         ExtractRegions,
-        ExtractItems
+        ExtractItems,
+        ExtractData
     }
 
     internal record CommandLineOptions
