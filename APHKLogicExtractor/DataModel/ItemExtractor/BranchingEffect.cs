@@ -1,5 +1,24 @@
 ﻿namespace APHKLogicExtractor.DataModel.ItemExtractor
 {
+    /// <summary>
+    /// Item effect which represents an "if-else" chain, applying the appropriate effect based on
+    /// which nested conditions were satisfied.
+    /// </summary>
+    /// <remarks>
+    /// Pseudocode for collect:
+    /// <code>
+    /// for conditional in self.conditionals:
+    ///   if apply_effect(state, conditional):
+    ///     break
+    /// else:
+    ///   if self.else:
+    ///     apply_effect(state, self.else)
+    /// </code>
+    /// 
+    /// Remove is not an easy implementation as we cannot easily determine statically how the applied
+    /// effect will or will not affect the value of the condition. Likely, resetting and recomputing affected
+    /// terms after removing the item from state is necessary.
+    /// </remarks>
     internal record BranchingEffect : IItemEffect
     {
         public string Type => "branching";

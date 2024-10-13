@@ -1,5 +1,21 @@
 ﻿namespace APHKLogicExtractor.DataModel.ItemExtractor
 {
+    /// <summary>
+    /// Item effect which composes multiple other item effects. Used only when simplification to another composite effect type is not possible.
+    /// </summary>
+    /// <remarks>
+    /// Pseudocode for collect:
+    /// <code>
+    /// for effect in self.effects:
+    ///   apply_effect(state, effect)
+    /// </code>
+    /// 
+    /// Pseudocode for remove:
+    /// <code>
+    /// for effect in self.effects:
+    ///   undo_effect(state, effect)
+    /// </code>
+    /// </remarks>
     internal record MultiEffect(IReadOnlyList<IItemEffect> Effects) : IItemEffect
     {
         public string Type => "multiple";

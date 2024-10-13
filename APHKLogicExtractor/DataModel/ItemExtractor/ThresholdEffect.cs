@@ -2,8 +2,33 @@
 {
     /// <summary>
     /// A special case of branching items to handle items of a form like "if TERM&lt;THRESHOLD, TERM++ and other effects, else TERM++"
-    /// and similar, such as HK charms
+    /// and similar, such as HK charms.
     /// </summary>
+    /// <remarks>
+    /// Pseudocode for collect:
+    /// <code>
+    /// if state.terms[self.term] &lt; self.threshold:
+    ///   # see incrementTerms effect
+    ///   increment_terms(self.below_threshold)
+    /// elif state.terms[self.term] &gt; self.threshold:
+    ///   increment_terms(self.above_threshold)
+    /// else:
+    ///   increment_terms(self.at_threshold)
+    /// state.terms[self.term] += 1
+    /// </code>
+    /// 
+    /// Pseudocode for remove:
+    /// <code>
+    /// state.terms[self.term] -= 1
+    /// if state.terms[self.term] &lt; self.threshold:
+    ///   # see incrementTerms effect
+    ///   decrement_terms(self.below_threshold)
+    /// elif state.terms[self.term] &gt; self.threshold:
+    ///   decrement_terms(self.above_threshold)
+    /// else:
+    ///   decrement_terms(self.at_threshold)
+    /// </code>
+    /// </remarks>
     internal record ThresholdEffect(string Term, int Threshold, 
         IReadOnlyDictionary<string, int> BelowThreshold, 
         IReadOnlyDictionary<string, int> AtThreshold,
