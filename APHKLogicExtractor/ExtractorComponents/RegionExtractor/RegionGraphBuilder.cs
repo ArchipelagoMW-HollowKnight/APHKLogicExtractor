@@ -37,6 +37,11 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             foreach (StatefulClause clause in logicObject.Logic)
             {
+                if (clause.Conditions.Contains(ConstToken.False))
+                {
+                    // this clause will never be reachable so ignore it
+                    continue;
+                }
                 string parentName = GetRegionName(clause.StateProvider);
                 Region parent = regions.GetValueOrDefault(parentName) ?? AddRegion(parentName);
                 var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
@@ -225,6 +230,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
             }
 
+            // todo - this removes regions like the $StartLocation[...] and $DEFAULTSTATE logic variables which are meaningful but not
+            // unconditionally reachable
+            //CullUnreachableRegions(protectedRegions);
             RemoveRedundantLogicBranches(classifier);
             while (regions.Values.Any(x => TryMergeIntoParent(x, protectedRegions))
                 || regions.Values.Any(x => TryMergeLogicless2Cycle(x, protectedRegions))
@@ -323,6 +331,18 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                             j--;
                         }
                     }
+                }
+            }
+        }
+
+        private void CullUnreachableRegions(IReadOnlySet<string> regionsToKeep)
+        {
+            foreach (Region region in regions.Values.Where(r => !regionsToKeep.Contains(r.Name)).ToList())
+            {
+                // if there is no way in (either static or randomized) then axe it
+                if (!region.Parents.Any() && !region.Transitions.Any())
+                {
+                    RemoveRegion(region.Name);
                 }
             }
         }
