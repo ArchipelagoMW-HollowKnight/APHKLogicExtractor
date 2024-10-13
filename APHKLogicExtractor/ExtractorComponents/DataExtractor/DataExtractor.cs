@@ -88,6 +88,13 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             logger.LogInformation("Beginning data extraction");
             JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
 
+            logger.LogInformation("Collecting scene metadata");
+            Dictionary<string, RoomDef> sceneData = [];
+            if (configuration.Data?.Rooms != null)
+            {
+                sceneData = await configuration.Data.Rooms.GetContent();
+            }
+
             logger.LogInformation("Collecting pool and cost information");
             List<PoolDef> pools = [];
             Dictionary<string, CostDef> vanillaLocationCosts = [];
@@ -135,12 +142,8 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                         {
                             costsToAdd.Add(new CostDef("GEO", SalubraGeoCostsByCharmCount[charmCost.Amount]));
                         }
-
-                        if (costsToAdd.Count > 0)
-                        {
-                            vanilla.Costs ??= [];
-                            vanilla.Costs.AddRange(costsToAdd);
-                        }
+                        vanilla.Costs ??= [];
+                        vanilla.Costs.AddRange(costsToAdd);
                     }
                     // get the corresponding option name, or inherit the last one if not provided
                     if (pool.Path != "")
@@ -160,21 +163,48 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             }
             logicOptions = logicOptions.ToDictionary(kv => kv.Key, kv => GetOptionName(kv.Value, ""));
 
-            logger.LogInformation("Collecting multi location data");
+            logger.LogInformation("Collecting location data");
+            Dictionary<string, LocationDetails> locations = [];
             List<string> multiLocations = [];
             if (configuration.Data?.Locations != null)
             {
-                Dictionary<string, LocationDef> locations = await configuration.Data.Locations.GetContent();
-                multiLocations.AddRange(locations.Values.Where(l => l.FlexibleCount).Select(l => l.Name));
+                Dictionary<string, LocationDef> locationDefs = await configuration.Data.Locations.GetContent();
+                foreach (var (location, def) in locationDefs)
+                {
+                    RoomDef? scene = sceneData.GetValueOrDefault(def.SceneName);
+                    LocationDetails transformed = new(
+                        scene?.MapArea ?? "",
+                        scene?.TitledArea ?? ""
+                    );
+                    locations[location] = transformed;
+                    if (def.FlexibleCount)
+                    {
+                        multiLocations.Add(location);
+                    }
+                }
             }
 
             logger.LogInformation("Collecting trando and start data");
-            Dictionary<string, TransitionDef> transitions = [];
+            Dictionary<string, TransitionDetails> transitions = [];
             Dictionary<string, StartDef> starts = [];
-            Dictionary<string, StartData> finalStarts = [];
+            Dictionary<string, StartDetails> finalStarts = [];
             if (configuration.Data?.Transitions != null)
             {
-                transitions = await configuration.Data.Transitions.GetContent();
+                Dictionary<string, TransitionDef> transitionDefs = await configuration.Data.Transitions.GetContent();
+                foreach (var (transition, def) in transitionDefs)
+                {
+                    RoomDef? scene = sceneData.GetValueOrDefault(def.SceneName);
+                    TransitionDetails transformed = new(
+                        def.VanillaTarget,
+                        def.Direction,
+                        def.Sides,
+                        scene?.MapArea ?? "",
+                        def.IsMapAreaTransition,
+                        scene?.TitledArea ?? "",
+                        def.IsTitledAreaTransition
+                    );
+                    transitions[transition] = transformed;
+                }
             }
             if (configuration.Data?.Starts != null)
             {
@@ -196,12 +226,12 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                         finalLogic.Add(new RequirementBranch(itemReqs, locationReqs, regionReqs, []));
                     }
                 }
-                finalStarts.Add(start.Name.ToLowerInvariant().Replace(' ', '_'), new StartData(start.Name, start.Transition, finalLogic));
+                finalStarts.Add(start.Name.ToLowerInvariant().Replace(' ', '_'), new StartDetails(start.Name, start.Transition, finalLogic));
             }
 
             logger.LogInformation("Beginning final output");
             PoolData poolData = new(finalPoolOptions, logicOptions);
-            LocationData locationData = new(multiLocations);
+            LocationData locationData = new(locations, multiLocations);
             TrandoData trandoData = new(transitions, finalStarts);
             using (StreamWriter writer = outputManager.CreateOuputFileText("option_data.py"))
             {
@@ -214,6 +244,14 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             using (StreamWriter writer = outputManager.CreateOuputFileText("trando_data.py"))
             {
                 pythonizer.Write(trandoData, writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/map_area_names.py"))
+            {
+                pythonizer.WriteEnum("MapAreaNames", sceneData.Values.Select(s => s.MapArea).Distinct(), writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/titled_area_names.py"))
+            {
+                pythonizer.WriteEnum("TitledAreaNames", sceneData.Values.Select(s => s.TitledArea).Distinct(), writer);
             }
 
             logger.LogInformation("Successfully extracted non-logic data");

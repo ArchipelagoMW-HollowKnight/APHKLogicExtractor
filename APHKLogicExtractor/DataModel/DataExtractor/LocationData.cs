@@ -1,4 +1,6 @@
 ﻿namespace APHKLogicExtractor.DataModel.DataExtractor
 {
-    internal record LocationData(List<string> MultiLocations);
+    internal record LocationDetails(string MapArea, string TitledArea);
+
+    internal record LocationData(Dictionary<string, LocationDetails> Locations, List<string> MultiLocations);
 }
