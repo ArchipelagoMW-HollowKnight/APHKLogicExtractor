@@ -230,9 +230,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 }
             }
 
-            // todo - this removes regions like the $StartLocation[...] and $DEFAULTSTATE logic variables which are meaningful but not
-            // unconditionally reachable
-            //CullUnreachableRegions(protectedRegions);
+            CullUselessRegions(protectedRegions);
             RemoveRedundantLogicBranches(classifier);
             while (regions.Values.Any(x => TryMergeIntoParent(x, protectedRegions))
                 || regions.Values.Any(x => TryMergeLogicless2Cycle(x, protectedRegions))
@@ -335,12 +333,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
         }
 
-        private void CullUnreachableRegions(IReadOnlySet<string> regionsToKeep)
+        private void CullUselessRegions(IReadOnlySet<string> regionsToKeep)
         {
             foreach (Region region in regions.Values.Where(r => !regionsToKeep.Contains(r.Name)).ToList())
             {
-                // if there is no way in (either static or randomized) then axe it
-                if (!region.Parents.Any() && !region.Transitions.Any())
+                // if there is no way in/out (either static or randomized) then axe it
+                if (!region.Parents.Any() && !region.Exits.Any() && !region.Transitions.Any())
                 {
                     RemoveRegion(region.Name);
                 }
