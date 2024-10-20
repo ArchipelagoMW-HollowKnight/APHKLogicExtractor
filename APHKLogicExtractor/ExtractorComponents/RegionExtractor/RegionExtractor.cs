@@ -3,6 +3,7 @@ using DotNetGraph.Compilation;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
@@ -79,10 +80,30 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     world.Transitions.Select(t => t.Name),
                     writer);
             }
+
             using (StreamWriter writer = outputManager.CreateOuputFileText("regionGraph.dot"))
             {
                 CompilationContext ctx = new(writer, new CompilationOptions());
                 await builder.BuildDotGraph().CompileAsync(ctx);
+            }
+            // if dot is on the path, auto-convert to SVG for convenience
+            try
+            {
+                string dotFilePath = outputManager.GetOutputPath("regionGraph.dot");
+                string svgFilePath = outputManager.GetOutputPath("regionGraph.svg");
+                ProcessStartInfo si = new("dot", ["-Tsvg", "-o", svgFilePath, dotFilePath])
+                {
+                    CreateNoWindow = true,
+                };
+                Process? proc = Process.Start(si);
+                if (proc != null)
+                {
+                    await proc.WaitForExitAsync(CancellationToken.None);
+                }
+            }
+            catch (Exception ex) 
+            {
+                logger.LogWarning(ex, "Unable to automatically convert visual graph to svg.");
             }
             logger.LogInformation("Successfully exported {} regions ({} empty) and {} locations",
                 world.Regions.Count(),

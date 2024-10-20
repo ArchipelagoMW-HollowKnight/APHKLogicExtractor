@@ -49,4 +49,5 @@ IEnumerable<Task> tasks = host.Services.GetServices<IHostedService>()
     .Where(x => x.ExecuteTask != null)
     .Select(x => x.ExecuteTask!);
 await Task.WhenAll(tasks);
+host.Services.GetService<OutputManager>()?.Bundle();
 
