@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RandomizerCore.Logic;
+using RandomizerCore.Logic.StateLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 {
@@ -87,7 +88,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 
             logger.LogInformation("Beginning data extraction");
             JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
-
+            
             logger.LogInformation("Collecting scene metadata");
             Dictionary<string, RoomDef> sceneData = [];
             if (configuration.Data?.Rooms != null)
@@ -229,10 +230,30 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 finalStarts.Add(start.Name.ToLowerInvariant().Replace(' ', '_'), new StartDetails(start.Name, start.Transition, finalLogic));
             }
 
+            logger.LogInformation("Collecting state data");
+            Dictionary<string, int> stateFieldDefaults = new();
+            if (configuration.Logic?.State != null)
+            {
+                RawStateData rawStateData = await configuration.Logic.State.GetContent();
+                StateManagerBuilder smb = new();
+                smb.AppendRawStateData(rawStateData);
+                StateManager sm = new(smb);
+
+                foreach (StateInt @int in sm.Ints)
+                {
+                    stateFieldDefaults[@int.Name] = @int.GetDefaultValue(sm);
+                }
+                foreach (StateBool @bool in sm.Bools)
+                {
+                    stateFieldDefaults[@bool.Name] = @bool.GetDefaultValue(sm) ? 1 : 0;
+                }
+            }
+
             logger.LogInformation("Beginning final output");
             PoolData poolData = new(finalPoolOptions, logicOptions);
             LocationData locationData = new(locations, multiLocations);
             TrandoData trandoData = new(transitions, finalStarts);
+            StateData stateData = new(stateFieldDefaults);
             using (StreamWriter writer = outputManager.CreateOuputFileText("option_data.py"))
             {
                 pythonizer.Write(poolData, writer);
@@ -245,6 +266,10 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             {
                 pythonizer.Write(trandoData, writer);
             }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("state_data.py"))
+            {
+                pythonizer.Write(stateData, writer);
+            }
             using (StreamWriter writer = outputManager.CreateOuputFileText("constants/map_area_names.py"))
             {
                 pythonizer.WriteEnum("MapAreaNames", sceneData.Values.Select(s => s.MapArea).Distinct(), writer);
@@ -252,6 +277,10 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             using (StreamWriter writer = outputManager.CreateOuputFileText("constants/titled_area_names.py"))
             {
                 pythonizer.WriteEnum("TitledAreaNames", sceneData.Values.Select(s => s.TitledArea).Distinct(), writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/state_field_names.py"))
+            {
+                pythonizer.WriteEnum("StateFieldNames", stateData.FieldDefaults.Keys, writer);
             }
 
             logger.LogInformation("Successfully extracted non-logic data");

@@ -51,6 +51,8 @@ namespace APHKLogicExtractor.ExtractorComponents
             string temp = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             ZipFile.CreateFromDirectory(options.Output, temp);
             File.Move(temp, fullPath);
+
+            logger.LogInformation($"Successfully bundled output zip file at {fullPath}");
         }
     }
 }
