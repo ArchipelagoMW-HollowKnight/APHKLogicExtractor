@@ -31,5 +31,10 @@ namespace APHKLogicExtractor
         /// When true, the resource cache will be ignored.
         /// </summary>
         public bool IgnoreCache { get; set; } = false;
+
+        /// <summary>
+        /// When true, the output folder will be bundled into a zip file.
+        /// </summary>
+        public bool Bundle { get; set; } = false;
     }
 }
