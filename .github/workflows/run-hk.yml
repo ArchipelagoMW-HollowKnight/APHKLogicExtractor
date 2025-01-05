@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install Graphviz
+      run: sudo apt install graphviz
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
