@@ -50,6 +50,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
         {
             while (selectedIds.Contains(newId))
             {
+                logger.LogWarning("Hash collision found ({})", newId);
                 newId++;
             }
             return newId;

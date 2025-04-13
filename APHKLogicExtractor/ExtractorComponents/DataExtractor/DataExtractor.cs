@@ -167,10 +167,15 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 
             logger.LogInformation("Collecting item data");
             Dictionary<string, long> itemNameToId = new();
+            HashSet<string> itemsToIgnore = [];
+            if (input.IgnoredItems != null)
+            {
+                itemsToIgnore = await input.IgnoredItems.GetContent();
+            }
             if (configuration.Data?.Items != null)
             {
                 Dictionary<string, ItemDef> itemDefs = await configuration.Data.Items.GetContent();
-                itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys);
+                itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys.Where(x => !itemsToIgnore.Contains(x)));
             }
 
             logger.LogInformation("Collecting location data");
