@@ -3,6 +3,7 @@
   "configuration": {
     "data": {
       "rooms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/rooms.json",
+      "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/items.json",
       "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/locations.json",
       "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/transitions.json",
       "pools": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/pools.json",

@@ -15,6 +15,7 @@ internal record JsonLogicConfiguration
 internal record JsonData
 {
     public MaybeFile<Dictionary<string, RoomDef>>? Rooms { get; set; }
+    public MaybeFile<Dictionary<string, ItemDef>>? Items { get; set; }
     public MaybeFile<Dictionary<string, LocationDef>>? Locations { get; set; }
     public MaybeFile<Dictionary<string, TransitionDef>>? Transitions { get; set; }
     public MaybeFile<List<PoolDef>>? Pools { get; set; }

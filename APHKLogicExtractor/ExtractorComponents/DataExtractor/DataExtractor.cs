@@ -14,6 +14,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
         ApplicationInput input,
         ILogger<DataExtractor> logger,
         IOptions<CommandLineOptions> optionsService,
+        IdFactory idFactory,
         Pythonizer pythonizer,
         OutputManager outputManager) : BackgroundService
     {
@@ -164,9 +165,18 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             }
             logicOptions = logicOptions.ToDictionary(kv => kv.Key, kv => GetOptionName(kv.Value, ""));
 
+            logger.LogInformation("Collecting item data");
+            Dictionary<string, long> itemNameToId = new();
+            if (configuration.Data?.Items != null)
+            {
+                Dictionary<string, ItemDef> itemDefs = await configuration.Data.Items.GetContent();
+                itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys);
+            }
+
             logger.LogInformation("Collecting location data");
             Dictionary<string, LocationDetails> locations = [];
             List<string> multiLocations = [];
+            Dictionary<string, long> locationNameToId = new();
             if (configuration.Data?.Locations != null)
             {
                 Dictionary<string, LocationDef> locationDefs = await configuration.Data.Locations.GetContent();
@@ -183,6 +193,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                         multiLocations.Add(location);
                     }
                 }
+                locationNameToId = await idFactory.CreateIds(0, locationDefs.Keys);
             }
 
             logger.LogInformation("Collecting trando and start data");
@@ -250,10 +261,24 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             }
 
             logger.LogInformation("Beginning final output");
+            IdData idData = new(itemNameToId, locationNameToId);
             PoolData poolData = new(finalPoolOptions, logicOptions);
             LocationData locationData = new(locations, multiLocations);
             TrandoData trandoData = new(transitions, finalStarts);
             StateData stateData = new(stateFieldDefaults);
+            using (StreamWriter writer = outputManager.CreateOuputFileText("ids.py"))
+            {
+                pythonizer.Write(idData, writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("json/itemNameToId.json"))
+            {
+                JsonUtils.GetSerializer().Serialize(writer, idData.itemNameToId);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("json/locationNameToId.json"))
+            {
+                JsonUtils.GetSerializer().Serialize(writer, idData.locationNameToId);
+            }
+
             using (StreamWriter writer = outputManager.CreateOuputFileText("option_data.py"))
             {
                 pythonizer.Write(poolData, writer);

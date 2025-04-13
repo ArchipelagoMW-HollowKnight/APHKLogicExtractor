@@ -37,6 +37,7 @@ builder.Services.AddSingleton<OutputManager>();
 builder.Services.AddSingleton<VariableParser>();
 builder.Services.AddSingleton<StateModifierClassifier>();
 builder.Services.AddSingleton<StringWorldCompositor>();
+builder.Services.AddSingleton<IdFactory>();
 
 builder.Services.AddHostedService<RegionExtractor>();
 builder.Services.AddHostedService<ItemExtractor>();
