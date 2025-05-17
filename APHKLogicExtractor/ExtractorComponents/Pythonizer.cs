@@ -9,11 +9,29 @@ namespace APHKLogicExtractor.ExtractorComponents
 {
     internal partial class Pythonizer
     {
-        [GeneratedRegex(@"[^A-Z0-9_]")]
+        [GeneratedRegex(@"[^a-zA-Z0-9_]")]
         private static partial Regex BadNameCharFinder();
 
         [GeneratedRegex(@"_+")]
         private static partial Regex DoubleUnderscoreFinder();
+
+        public string PythonizeName(string name, bool upper = false)
+        {
+            if (upper)
+            {
+                name = name.ToUpperInvariant();
+            }
+            else
+            {
+                name = name.ToLowerInvariant();
+            }
+            name = name.Replace("'", "");
+            name = BadNameCharFinder().Replace(name, "_");
+            name = DoubleUnderscoreFinder().Replace(name, "_");
+            name = name.Trim('_');
+            name = name.TrimStart([.. "0123456789"]);
+            return name;
+        }
 
         public void WriteEnum(string name, IEnumerable<string> values, TextWriter writer)
         {
@@ -34,13 +52,7 @@ namespace APHKLogicExtractor.ExtractorComponents
             writer.WriteLine($"class {name}(StrEnum):");
             foreach (var value in values)
             {
-                string valueName = value.ToUpperInvariant().Replace("'", "");
-                valueName = BadNameCharFinder().Replace(valueName, "_");
-                valueName = DoubleUnderscoreFinder().Replace(valueName, "_");
-                valueName = valueName.Trim('_');
-                valueName = valueName.TrimStart("0123456789".ToArray());
-
-                writer.WriteLine($"    {valueName} = {JsonConvert.SerializeObject(value)}");
+                writer.WriteLine($"    {PythonizeName(value, true)} = {JsonConvert.SerializeObject(value)}");
             }
         }
 

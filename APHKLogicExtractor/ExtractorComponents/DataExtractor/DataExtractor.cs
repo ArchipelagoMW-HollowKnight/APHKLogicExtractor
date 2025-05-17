@@ -245,7 +245,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                         finalLogic.Add(new RequirementBranch(itemReqs, locationReqs, regionReqs, []));
                     }
                 }
-                finalStarts.Add(start.Name.ToLowerInvariant().Replace(' ', '_'), new StartDetails(start.Name, start.Transition, finalLogic));
+                finalStarts.Add(pythonizer.PythonizeName(start.Name), new StartDetails(start.Name, start.Transition, finalLogic));
             }
 
             logger.LogInformation("Collecting state data");
