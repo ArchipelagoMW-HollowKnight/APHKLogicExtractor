@@ -146,7 +146,7 @@ namespace APHKLogicExtractor.DataModel
 
 
 
-        public (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs) 
+        public (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs)
             PartitionRequirements(LogicManager? lm)
         {
             HashSet<string> items = new HashSet<string>();

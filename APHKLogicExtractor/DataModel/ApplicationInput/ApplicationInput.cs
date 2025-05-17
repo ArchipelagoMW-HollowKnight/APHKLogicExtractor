@@ -16,7 +16,7 @@ public enum InputType
 internal record ApplicationInput
 {
     ///// Region extractor properties /////
-    
+
     [JsonProperty(Required = Required.Always)]
     public InputType Type { get; set; }
     // JsonLogic => JsonLogicConfiguration

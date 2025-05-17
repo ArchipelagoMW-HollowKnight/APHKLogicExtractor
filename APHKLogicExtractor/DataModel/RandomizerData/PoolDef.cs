@@ -13,6 +13,6 @@
         public required string Path { get; set; }
         public required List<string> IncludeItems { get; set; }
         public required List<string> IncludeLocations { get; set; }
-        public required List<VanillaDef> Vanilla {  get; set; }
+        public required List<VanillaDef> Vanilla { get; set; }
     }
 }

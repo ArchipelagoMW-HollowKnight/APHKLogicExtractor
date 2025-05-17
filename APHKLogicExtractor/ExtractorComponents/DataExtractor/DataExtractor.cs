@@ -89,7 +89,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 
             logger.LogInformation("Beginning data extraction");
             JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
-            
+
             logger.LogInformation("Collecting scene metadata");
             Dictionary<string, RoomDef> sceneData = [];
             if (configuration.Data?.Rooms != null)
@@ -132,7 +132,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                         // shop geo costs
                         var itemLocationPair = (vanilla.Location, vanilla.Item);
                         int i = usedCostsByItemLocationPair.GetValueOrDefault(itemLocationPair, 0);
-                        if (ShopGeoCosts.TryGetValue(itemLocationPair, out List<CostDef>? costs) 
+                        if (ShopGeoCosts.TryGetValue(itemLocationPair, out List<CostDef>? costs)
                             && i < costs.Count)
                         {
                             costsToAdd.Add(costs[i++]);

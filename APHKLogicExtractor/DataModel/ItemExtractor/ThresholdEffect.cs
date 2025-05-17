@@ -29,8 +29,8 @@
     ///   decrement_terms(self.at_threshold)
     /// </code>
     /// </remarks>
-    internal record ThresholdEffect(string Term, int Threshold, 
-        IReadOnlyDictionary<string, int> BelowThreshold, 
+    internal record ThresholdEffect(string Term, int Threshold,
+        IReadOnlyDictionary<string, int> BelowThreshold,
         IReadOnlyDictionary<string, int> AtThreshold,
         IReadOnlyDictionary<string, int> AboveThreshold) : IItemEffect
     {

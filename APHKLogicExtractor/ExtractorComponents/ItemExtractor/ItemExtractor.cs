@@ -203,7 +203,7 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                 IItemEffect? simplified = ConvertAndSimplifyEffect(lm, ce.Effect, ignoredTerms);
                 if (simplified == null)
                 {
-                    return null; 
+                    return null;
                 }
                 return new ConditionedEffect(branches, ce.Negated, simplified);
             }

@@ -43,7 +43,7 @@ namespace APHKLogicExtractor.DataModel
     }
 
     internal record StateClassificationModel(HashSet<string> BeneficialModifiers,
-        HashSet<string> DetrimentalModifiers, 
+        HashSet<string> DetrimentalModifiers,
         HashSet<string>? OtherModifiers = null,
         List<ArgumentClassifier>? ArgumentClassifiers = null);
 }

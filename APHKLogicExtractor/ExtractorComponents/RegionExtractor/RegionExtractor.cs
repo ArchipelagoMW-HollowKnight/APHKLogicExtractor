@@ -64,7 +64,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             using (StreamWriter writer = outputManager.CreateOuputFileText("constants/location_names.py"))
             {
-                pythonizer.WriteEnum("LocationNames", 
+                pythonizer.WriteEnum("LocationNames",
                     world.Locations.Where(l => !l.IsEvent).Select(l => l.Name),
                     writer);
             }
@@ -101,7 +101,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                     await proc.WaitForExitAsync(CancellationToken.None);
                 }
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 logger.LogWarning(ex, "Unable to automatically convert visual graph to svg.");
             }

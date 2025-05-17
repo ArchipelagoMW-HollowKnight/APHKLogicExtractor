@@ -83,7 +83,7 @@
         {
             if (effect is MultiEffect me)
             {
-                return new MultiEffect([.. me.Effects, incr]).Simplify() 
+                return new MultiEffect([.. me.Effects, incr]).Simplify()
                     ?? throw new NullReferenceException("Expected non-null result from Multi+Increment simplify");
             }
             else if (effect is BranchingEffect be)

@@ -9,9 +9,9 @@ namespace APHKLogicExtractor.DataModel
         List<string> StateModifiers)
     {
         [JsonIgnore]
-        public bool IsEmpty => ItemRequirements.Count == 0 
-            && LocationRequirements.Count == 0 
-            && RegionRequirements.Count == 0 
+        public bool IsEmpty => ItemRequirements.Count == 0
+            && LocationRequirements.Count == 0
+            && RegionRequirements.Count == 0
             && StateModifiers.Count == 0;
 
         public static RequirementBranch operator +(RequirementBranch lhs, RequirementBranch rhs)
