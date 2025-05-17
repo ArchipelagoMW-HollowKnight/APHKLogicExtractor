@@ -167,6 +167,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 
             logger.LogInformation("Collecting item data");
             Dictionary<string, long> itemNameToId = new();
+            Dictionary<string, int> itemGeoCostCaps = new();
             HashSet<string> itemsToIgnore = [];
             if (input.IgnoredItems != null)
             {
@@ -176,6 +177,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             {
                 Dictionary<string, ItemDef> itemDefs = await configuration.Data.Items.GetContent();
                 itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys.Where(x => !itemsToIgnore.Contains(x)));
+                itemGeoCostCaps = itemDefs.Values.ToDictionary(x => x.Name, x => x.PriceCap);
             }
 
             logger.LogInformation("Collecting location data");
@@ -268,6 +270,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             logger.LogInformation("Beginning final output");
             IdData idData = new(itemNameToId, locationNameToId);
             PoolData poolData = new(finalPoolOptions, logicOptions);
+            ItemData itemData = new(itemGeoCostCaps);
             LocationData locationData = new(locations, multiLocations);
             TrandoData trandoData = new(transitions, finalStarts);
             StateData stateData = new(stateFieldDefaults);
@@ -287,6 +290,10 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             using (StreamWriter writer = outputManager.CreateOuputFileText("option_data.py"))
             {
                 pythonizer.Write(poolData, writer);
+            }
+            using (StreamWriter writer = outputManager.CreateOuputFileText("item_data.py"))
+            {
+                pythonizer.Write(itemData, writer);
             }
             using (StreamWriter writer = outputManager.CreateOuputFileText("location_data.py"))
             {

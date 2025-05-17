@@ -163,8 +163,8 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             }
 
             logger.LogInformation("Beginning final output");
-            ItemData data = new(progEffects, nonProgItems, termsByItem, itemsByTerm);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("item_data.py"))
+            ItemEffectData data = new(progEffects, nonProgItems, termsByItem, itemsByTerm);
+            using (StreamWriter writer = outputManager.CreateOuputFileText("item_effects.py"))
             {
                 pythonizer.Write(data, writer);
             }

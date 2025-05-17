@@ -58,7 +58,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 regionsToKeep = await input.EmptyRegionsToKeep.GetContent();
             }
             GraphWorldDefinition world = builder.Build(stateClassifier, regionsToKeep);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("region_data.py"))
+            using (StreamWriter writer = outputManager.CreateOuputFileText("region_structure.py"))
             {
                 pythonizer.Write(world, writer);
             }
