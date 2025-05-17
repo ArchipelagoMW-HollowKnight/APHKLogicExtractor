@@ -274,48 +274,48 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             LocationData locationData = new(locations, multiLocations);
             TrandoData trandoData = new(transitions, finalStarts);
             StateData stateData = new(stateFieldDefaults);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("ids.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("ids.py"))
             {
                 pythonizer.Write(idData, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("json/itemNameToId.json"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("json/itemNameToId.json"))
             {
                 JsonUtils.GetSerializer().Serialize(writer, idData.itemNameToId);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("json/locationNameToId.json"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("json/locationNameToId.json"))
             {
                 JsonUtils.GetSerializer().Serialize(writer, idData.locationNameToId);
             }
 
-            using (StreamWriter writer = outputManager.CreateOuputFileText("option_data.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("option_data.py"))
             {
                 pythonizer.Write(poolData, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("item_data.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("item_data.py"))
             {
                 pythonizer.Write(itemData, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("location_data.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("location_data.py"))
             {
                 pythonizer.Write(locationData, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("trando_data.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("trando_data.py"))
             {
                 pythonizer.Write(trandoData, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("state_data.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("state_data.py"))
             {
                 pythonizer.Write(stateData, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/map_area_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/map_area_names.py"))
             {
                 pythonizer.WriteEnum("MapAreaNames", sceneData.Values.Select(s => s.MapArea).Distinct(), writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/titled_area_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/titled_area_names.py"))
             {
                 pythonizer.WriteEnum("TitledAreaNames", sceneData.Values.Select(s => s.TitledArea).Distinct(), writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/state_field_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/state_field_names.py"))
             {
                 pythonizer.WriteEnum("StateFieldNames", stateData.FieldDefaults.Keys, writer);
             }

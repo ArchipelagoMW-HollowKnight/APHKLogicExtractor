@@ -29,7 +29,7 @@ namespace APHKLogicExtractor.ExtractorComponents
             return File.Create(fullPath);
         }
 
-        public StreamWriter CreateOuputFileText(string name)
+        public StreamWriter CreateOutputFileText(string name)
         {
             string fullPath = GetOutputPath(name);
             EnsureOutputPath(fullPath);

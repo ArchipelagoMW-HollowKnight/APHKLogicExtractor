@@ -58,30 +58,30 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 regionsToKeep = await input.EmptyRegionsToKeep.GetContent();
             }
             GraphWorldDefinition world = builder.Build(stateClassifier, regionsToKeep);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("region_structure.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("region_structure.py"))
             {
                 pythonizer.Write(world, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/location_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/location_names.py"))
             {
                 pythonizer.WriteEnum("LocationNames",
                     world.Locations.Where(l => !l.IsEvent).Select(l => l.Name),
                     writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/event_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/event_names.py"))
             {
                 pythonizer.WriteEnum("EventNames",
                     world.Locations.Where(l => l.IsEvent).Select(l => l.Name),
                     writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/transition_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/transition_names.py"))
             {
                 pythonizer.WriteEnum("TransitionNames",
                     world.Transitions.Select(t => t.Name),
                     writer);
             }
 
-            using (StreamWriter writer = outputManager.CreateOuputFileText("regionGraph.dot"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("regionGraph.dot"))
             {
                 CompilationContext ctx = new(writer, new CompilationOptions());
                 await builder.BuildDotGraph().CompileAsync(ctx);

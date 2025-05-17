@@ -164,17 +164,17 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
 
             logger.LogInformation("Beginning final output");
             ItemEffectData data = new(progEffects, nonProgItems, termsByItem, itemsByTerm);
-            using (StreamWriter writer = outputManager.CreateOuputFileText("item_effects.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("item_effects.py"))
             {
                 pythonizer.Write(data, writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/item_names.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/item_names.py"))
             {
                 pythonizer.WriteEnum("LocationNames",
                     progEffects.Keys.Concat(nonProgItems),
                     writer);
             }
-            using (StreamWriter writer = outputManager.CreateOuputFileText("constants/terms.py"))
+            using (StreamWriter writer = outputManager.CreateOutputFileText("constants/terms.py"))
             {
                 pythonizer.WriteEnum("Terms", terms.Select(t => t.Name)
                     .Concat(transitionLogic.Select(t => t.name))
