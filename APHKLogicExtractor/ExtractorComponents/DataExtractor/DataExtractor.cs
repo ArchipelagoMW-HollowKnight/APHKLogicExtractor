@@ -176,7 +176,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             if (configuration.Data?.Items != null)
             {
                 Dictionary<string, ItemDef> itemDefs = await configuration.Data.Items.GetContent();
-                itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys.Where(x => !itemsToIgnore.Contains(x)));
+                itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys.Where(x => !itemsToIgnore.Contains(x)), []);
                 itemGeoCostCaps = itemDefs.Values.ToDictionary(x => x.Name, x => x.PriceCap);
             }
 
@@ -200,7 +200,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                         multiLocations.Add(location);
                     }
                 }
-                locationNameToId = await idFactory.CreateIds(0, locationDefs.Keys);
+                locationNameToId = await idFactory.CreateIds(0, locationDefs.Keys, multiLocations.ToDictionary(x => x, x => 16));
             }
 
             logger.LogInformation("Collecting trando and start data");

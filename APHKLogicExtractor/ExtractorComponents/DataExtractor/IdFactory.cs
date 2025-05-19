@@ -6,7 +6,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 {
     internal class IdFactory(ILogger<IdFactory> logger)
     {
-        public async Task<Dictionary<string, long>> CreateIds(uint connectionId, IEnumerable<string> values)
+        public async Task<Dictionary<string, long>> CreateIds(uint connectionId, IEnumerable<string> values, Dictionary<string, int> multiplicity)
         {
             // upper bound id is 2**53 - 1 and the lower order 32 bits are for the generated id, which gives
             // us the other 21
@@ -20,7 +20,18 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             // cheating our duplicate detection a bit here - 0 is reserved so treat it as already chosen (by someone else)
             HashSet<uint> selectedIds = [0];
             Dictionary<string, long> nameToIdMapping = [];
-            foreach (string val in values.ToHashSet().Order())
+            IEnumerable<string> valuesWithMultiplicity = values.SelectMany(v =>
+            {
+                if (multiplicity.TryGetValue(v, out int count))
+                {
+                    return EnumerateWithMultiplicity(v, count);
+                }
+                else
+                {
+                    return [v];
+                }
+            });
+            foreach (string val in valuesWithMultiplicity.ToHashSet().Order())
             {
                 using MD5 md5 = MD5.Create();
                 byte[] valBytes = Encoding.UTF8.GetBytes(val);
@@ -54,6 +65,14 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 newId++;
             }
             return newId;
+        }
+
+        private IEnumerable<string> EnumerateWithMultiplicity(string value, int count)
+        {
+            for (int i = 1; i <= count; i++)
+            {
+                yield return $"{value}_{i}";
+            }
         }
     }
 }
