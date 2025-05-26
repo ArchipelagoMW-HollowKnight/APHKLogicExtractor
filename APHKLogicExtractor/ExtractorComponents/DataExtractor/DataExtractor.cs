@@ -177,7 +177,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             {
                 Dictionary<string, ItemDef> itemDefs = await configuration.Data.Items.GetContent();
                 itemNameToId = await idFactory.CreateIds(0, itemDefs.Keys.Where(x => !itemsToIgnore.Contains(x)), []);
-                itemGeoCostCaps = itemDefs.Values.ToDictionary(x => x.Name, x => x.PriceCap);
+                itemGeoCostCaps = itemDefs.Values.Where(x => !itemsToIgnore.Contains(x.Name)).ToDictionary(x => x.Name, x => x.PriceCap);
             }
 
             logger.LogInformation("Collecting location data");

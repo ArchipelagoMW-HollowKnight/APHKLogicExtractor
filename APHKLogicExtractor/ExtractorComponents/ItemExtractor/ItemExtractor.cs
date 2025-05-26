@@ -170,7 +170,7 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             }
             using (StreamWriter writer = outputManager.CreateOutputFileText("constants/item_names.py"))
             {
-                pythonizer.WriteEnum("LocationNames",
+                pythonizer.WriteEnum("ItemNames",
                     progEffects.Keys.Concat(nonProgItems),
                     writer);
             }
