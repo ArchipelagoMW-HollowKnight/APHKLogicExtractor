@@ -114,7 +114,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 logicOptions = await configuration.Data.LogicSettings.GetContent();
             }
             Dictionary<(string loc, string item), int> usedCostsByItemLocationPair = new();
-            Dictionary<string, List<VanillaDef>> finalPoolOptions = new();
+            Dictionary<string, ApPoolDef> finalPoolOptions = new();
             string optionName = "";
             foreach (PoolDef pool in pools)
             {
@@ -157,9 +157,11 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                     {
                         if (!finalPoolOptions.ContainsKey(optionName))
                         {
-                            finalPoolOptions[optionName] = [];
+                            finalPoolOptions[optionName] = ApPoolDef.Empty();
                         }
-                        finalPoolOptions[optionName].AddRange(pool.Vanilla);
+                        finalPoolOptions[optionName].Randomized.Items.AddRange(pool.IncludeItems);
+                        finalPoolOptions[optionName].Randomized.Locations.AddRange(pool.IncludeLocations);
+                        finalPoolOptions[optionName].Vanilla.AddRange(pool.Vanilla);
                     }
                 }
             }
