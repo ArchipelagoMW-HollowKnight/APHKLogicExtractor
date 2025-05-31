@@ -67,10 +67,7 @@
                     && e2.Effects.TryGetValue(term, out int v2) && v2 == 1)
                 {
                     Dictionary<string, int>? metEffects = new(e1.Effects);
-                    metEffects.Remove(term);
-
                     Dictionary<string, int>? notMetEffects = new(e2.Effects);
-                    notMetEffects.Remove(term);
 
                     // handle effect arrangement.
                     if (rawReq.IndexOf('<') >= 0)
