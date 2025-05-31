@@ -1,10 +1,13 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Reflection;
 
 namespace APHKLogicExtractor.Loader;
 
 internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
 {
+    public override bool CanWrite => false;
+
     public override bool CanConvert(Type objectType)
     {
         return objectType.IsGenericType && objectType.GetGenericTypeDefinition() == typeof(MaybeFile<>);
@@ -32,7 +35,7 @@ internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
 
             object? deserialized = serializer.Deserialize(reader, innerType);
             object? instance = Activator.CreateInstance(objectType);
-            objectType.GetProperty(nameof(MaybeFile<object>.Content))?.SetValue(instance, deserialized);
+            objectType.GetField("content", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(instance, new ResourceLock<object?>(deserialized));
             if (innerType == typeof(JToken))
             {
                 objectType.GetProperty(nameof(MaybeFile<object>.Serializer))?.SetValue(instance, serializer);
@@ -49,17 +52,7 @@ internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
         object? value,
         JsonSerializer serializer)
     {
-        Type objType = value!.GetType();
-
-        object? lazy = objType.GetProperty(nameof(MaybeFile<object>.Lazy))?.GetValue(value);
-        if (lazy != null)
-        {
-            serializer.Serialize(writer, null);
-            return;
-        }
-
-        object? content = objType.GetProperty(nameof(MaybeFile<object>.Content))?.GetValue(value);
-        serializer.Serialize(writer, content);
+        throw new InvalidOperationException();
     }
 }
 
@@ -67,7 +60,8 @@ internal class MaybeFile<T> where T : class
 {
     public (ResourceLoader loader, string uri)? Lazy { get; set; }
     public JsonSerializer? Serializer { get; set; }
-    public object? Content { get; set; }
+
+    private ResourceLock<object?> content = new(null);
 
     public Task<T> GetContent()
     {
@@ -76,25 +70,28 @@ internal class MaybeFile<T> where T : class
 
     public async Task<U> GetContent<U>() where U : class
     {
+        using ResourceLock<object?>.LockGuard guard = await this.content.Enter(TimeSpan.FromSeconds(30));
+
         if (this.Lazy != null)
         {
             var (loader, uri) = this.Lazy.Value;
             ResourceLoader.Content rawContent = await loader.Load(uri);
 
-            this.Content = rawContent.AsJson<U>();
+            guard.Value = rawContent.AsJson<U>();
             this.Lazy = null;
         }
 
-        if (this.Serializer != null && typeof(U) != typeof(JToken) && this.Content is JToken tokens)
+        if (guard.Value is U data)
         {
-            this.Content = tokens.ToObject<U>(this.Serializer);
+            return data;
         }
 
-        if (this.Content is U content)
+        if (this.Serializer != null && guard.Value is JToken tokens)
         {
-            return content;
+            return tokens.ToObject<U>(this.Serializer)
+                ?? throw new InvalidCastException($"Unable to cast content to the given type: {typeof(U)} from null");
         }
 
-        throw new InvalidCastException($"Unable to cast content to the given type: {typeof(U)} from {this.Content?.GetType().ToString() ?? "null"}");
+        throw new InvalidCastException($"Unable to cast content to the given type: {typeof(U)} from {guard.Value?.GetType().ToString() ?? "null"}");
     }
 };
