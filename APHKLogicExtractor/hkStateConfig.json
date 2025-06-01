@@ -1,25 +1,26 @@
 {
   "BeneficialModifiers": [
-    "$BENCHRESET", // derived from named state, could be mixed but default beneficially resets most fields
+    "$BENCHRESET",
     "$FLOWERGET",
-    "$HOTSPRINGRESET", // derived from named state, could be mixed but default fills soul
+    "$HOTSPRINGRESET",
     "$REGAINSOUL",
-    "$STARTRESPAWN" // derived from named state, could be mixed but default recovers soul and HP from start location
+    "$STARTRESPAWN" // restores soul and HP
   ],
   "DetrimentalModifiers": [
     "$SHADESKIP",
     "$SPENDSOUL",
     "$TAKEDAMAGE",
+    "$LIFEBLOOD",
     "$EQUIPCHARM",
-    "$STAGSTATEMODIFIER",
-    "$SAVEQUITRESET" // derived from named state, could be mixed but default just removes soul on save/quit or warp
+    "$STAGSTATEMODIFIER"
   ],
   "OtherModifiers": [
     "$CASTSPELL",
     "$SHRIEKPOGO",
     "$SLOPEBALL",
-    "$WARPTOBENCH", // derived from named state (savequitreset + benchreset)
-    "$WARPTOSTART" // derived from named state (savequitreset + startrespawn)
+    "$WARPTOBENCH", // savequitreset + benchreset
+    "$WARPTOSTART", // savequitreset + startrespawn
+    "$SAVEQUITRESET" // spends all soul & "breaks" flower, but also restores health and shade
   ],
   "ArgumentClassifiers": [
     // spell casts are always bad if you can't get soul before/after them
