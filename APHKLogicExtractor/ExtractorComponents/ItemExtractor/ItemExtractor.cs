@@ -37,77 +37,12 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             }
 
             logger.LogInformation("Beginning item extraction");
-
             logger.LogInformation("Fetching logic");
             JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
-            Dictionary<string, List<string>> rawTerms = [];
-            if (configuration.Logic?.Terms != null)
-            {
-                rawTerms = await configuration.Logic.Terms.GetContent();
-            }
-
-            TermCollectionBuilder terms = RcUtils.AssembleTerms(rawTerms);
-            RawStateData stateData = new();
-            if (configuration?.Logic?.State != null)
-            {
-                stateData = await configuration.Logic.State.GetContent();
-            }
-
-            List<RawLogicDef> transitionLogic = [];
-            if (configuration?.Logic?.Transitions != null)
-            {
-                transitionLogic = await configuration.Logic.Transitions.GetContent();
-            }
-
-            List<RawLogicDef> locationLogic = [];
-            if (configuration?.Logic?.Locations != null)
-            {
-                locationLogic = await configuration.Logic.Locations.GetContent();
-            }
-
-            Dictionary<string, string> macroLogic = [];
-            if (configuration?.Logic?.Macros != null)
-            {
-                macroLogic = await configuration.Logic.Macros.GetContent();
-            }
-
-            List<RawWaypointDef> waypointLogic = [];
-            if (configuration?.Logic?.Waypoints != null)
-            {
-                waypointLogic = await configuration.Logic.Waypoints.GetContent();
-            }
-
-            List<StringItemTemplate> itemTemplates = [];
-            if (configuration?.Logic?.Items != null)
-            {
-                itemTemplates = await configuration.Logic.Items.GetContent();
-            }
-
+            
             logger.LogInformation("Preparing logic manager");
-            LogicManagerBuilder preprocessorLmb = new() { VariableResolver = new DummyVariableResolver() };
-            preprocessorLmb.LP.SetMacro(macroLogic);
-            preprocessorLmb.StateManager.AppendRawStateData(stateData);
-            foreach (Term term in terms)
-            {
-                preprocessorLmb.GetOrAddTerm(term.Name, term.Type);
-            }
-            foreach (RawWaypointDef wp in waypointLogic)
-            {
-                preprocessorLmb.AddWaypoint(wp);
-            }
-            foreach (RawLogicDef transition in transitionLogic)
-            {
-                preprocessorLmb.AddTransition(transition);
-            }
-            foreach (RawLogicDef location in locationLogic)
-            {
-                preprocessorLmb.AddLogicDef(location);
-            }
-            foreach (StringItemTemplate template in itemTemplates)
-            {
-                preprocessorLmb.AddItem(template);
-            }
-            LogicManager lm = new(preprocessorLmb);
+            LogicManagerContext ctx = await RcUtils.ConstructLogicManager(configuration);
+            LogicManager lm = ctx.LogicManager;
 
             logger.LogInformation("Processing item effects");
             HashSet<string> ignoredTerms = [];
@@ -176,9 +111,9 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             }
             using (StreamWriter writer = outputManager.CreateOutputFileText("constants/terms.py"))
             {
-                pythonizer.WriteEnum("Terms", terms.Select(t => t.Name)
-                    .Concat(transitionLogic.Select(t => t.name))
-                    .Concat(waypointLogic.Where(w => w.stateless).Select(w => w.name)), writer);
+                pythonizer.WriteEnum("Terms", ctx.Terms.Select(t => t.Name)
+                    .Concat(ctx.TransitionLogic.Select(t => t.name))
+                    .Concat(ctx.WaypointLogic.Where(w => w.stateless).Select(w => w.name)), writer);
             }
             logger.LogInformation("Successfully exported {} progression items and {} non-progression items",
                 progEffects.Count,
