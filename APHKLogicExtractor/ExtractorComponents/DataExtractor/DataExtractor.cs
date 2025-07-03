@@ -88,7 +88,8 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             }
 
             logger.LogInformation("Beginning data extraction");
-            JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
+            List<JsonLogicConfiguration> configs = await JsonLogicConfiguration.ParseManyAsync(input.Configuration);
+            JsonLogicConfiguration configuration = await JsonLogicConfiguration.MergeManyAsync(configs);
 
             logger.LogInformation("Collecting scene metadata");
             Dictionary<string, RoomDef> sceneData = [];
@@ -130,7 +131,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                             costsToAdd.Add(cd);
                         }
                         // shop geo costs
-                        var itemLocationPair = (vanilla.Location, vanilla.Item);
+                        (string Location, string Item) itemLocationPair = (vanilla.Location, vanilla.Item);
                         int i = usedCostsByItemLocationPair.GetValueOrDefault(itemLocationPair, 0);
                         if (ShopGeoCosts.TryGetValue(itemLocationPair, out List<CostDef>? costs)
                             && i < costs.Count)
@@ -189,7 +190,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             if (configuration.Data?.Locations != null)
             {
                 Dictionary<string, LocationDef> locationDefs = await configuration.Data.Locations.GetContent();
-                foreach (var (location, def) in locationDefs)
+                foreach ((string location, LocationDef def) in locationDefs)
                 {
                     RoomDef? scene = sceneData.GetValueOrDefault(def.SceneName);
                     LocationDetails transformed = new(
@@ -212,7 +213,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             if (configuration.Data?.Transitions != null)
             {
                 Dictionary<string, TransitionDef> transitionDefs = await configuration.Data.Transitions.GetContent();
-                foreach (var (transition, def) in transitionDefs)
+                foreach ((string transition, TransitionDef def) in transitionDefs)
                 {
                     RoomDef? scene = sceneData.GetValueOrDefault(def.SceneName);
                     TransitionDetails transformed = new(
@@ -241,7 +242,8 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 foreach (StatefulClause clause in clauses)
                 {
                     // these can't be stateful so the conversion to branches is easy
-                    var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
+                    (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs)
+                        = clause.PartitionRequirements(lm);
                     if (itemReqs.Count > 0 || locationReqs.Count > 0 || regionReqs.Count > 0)
                     {
                         finalLogic.Add(new RequirementBranch(itemReqs, locationReqs, regionReqs, []));

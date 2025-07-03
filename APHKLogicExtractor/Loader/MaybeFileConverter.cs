@@ -22,7 +22,7 @@ internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
         // The token is a string, therefore we'll try to load using the resourceLoader.
         if (reader.TokenType == JsonToken.String)
         {
-            object? instance = Activator.CreateInstance(objectType);
+            object? instance = Activator.CreateInstance(objectType, true);
             objectType.GetProperty("Lazy")?.SetValue(instance, (resourceLoader, reader.Value as string));
             return instance;
         }
@@ -34,7 +34,7 @@ internal class MaybeFileConverter(ResourceLoader resourceLoader) : JsonConverter
             Type innerType = objectType.GetGenericArguments()[0];
 
             object? deserialized = serializer.Deserialize(reader, innerType);
-            object? instance = Activator.CreateInstance(objectType);
+            object? instance = Activator.CreateInstance(objectType, true);
             objectType.GetField("content", BindingFlags.Instance | BindingFlags.NonPublic)?.SetValue(instance, new ResourceLock<object?>(deserialized));
             if (innerType == typeof(JToken))
             {
@@ -63,6 +63,14 @@ internal class MaybeFile<T> where T : class
 
     private ResourceLock<object?> content = new(null);
 
+    [JsonConstructor]
+    private MaybeFile() { }
+
+    public MaybeFile(T content)
+    {
+        this.content = new(content);
+    }
+
     public Task<T> GetContent()
     {
         return this.GetContent<T>();
@@ -74,7 +82,7 @@ internal class MaybeFile<T> where T : class
 
         if (this.Lazy != null)
         {
-            var (loader, uri) = this.Lazy.Value;
+            (ResourceLoader loader, string uri) = this.Lazy.Value;
             ResourceLoader.Content rawContent = await loader.Load(uri);
 
             guard.Value = rawContent.AsJson<U>();
@@ -94,4 +102,4 @@ internal class MaybeFile<T> where T : class
 
         throw new InvalidCastException($"Unable to cast content to the given type: {typeof(U)} from {guard.Value?.GetType().ToString() ?? "null"}");
     }
-};
+}

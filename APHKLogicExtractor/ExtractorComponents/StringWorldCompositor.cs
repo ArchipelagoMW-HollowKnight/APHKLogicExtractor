@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using RandomizerCore.Json;
 using RandomizerCore.Logic;
-using RandomizerCore.Logic.StateLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents;
 
@@ -51,11 +50,12 @@ internal class StringWorldCompositor(
     public async Task<StringWorldDefinition> FromLogicFiles(MaybeFile<JToken> input)
     {
         logger.LogInformation("Constructing Rando4 logic from files");
-        JsonLogicConfiguration configuration = await input.GetContent<JsonLogicConfiguration>();
+        List<JsonLogicConfiguration> configs = await JsonLogicConfiguration.ParseManyAsync(input);
+        JsonLogicConfiguration configuration = await JsonLogicConfiguration.MergeManyAsync(configs);
 
         logger.LogInformation("Preparing logic manager");
         LogicManagerContext ctx = await RcUtils.ConstructLogicManager(configuration);
-        
+
         List<LogicObjectDefinition> objects = [];
         // add waypoints to the region list first since they usually have better names after merging
         foreach (RawWaypointDef waypoint in ctx.WaypointLogic)

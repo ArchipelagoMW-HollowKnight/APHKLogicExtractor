@@ -1,8 +1,10 @@
 using APHKLogicExtractor.DataModel;
+using APHKLogicExtractor.Loader;
+using Newtonsoft.Json.Linq;
 using RandomizerCore.Logic;
-using RandomizerCore.StringLogic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
+using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.RC;
 
@@ -93,7 +95,7 @@ internal class RcUtils
         LogicManager lm = new(lmb);
 
         return new LogicManagerContext(
-            lm, terms, stateData, transitionLogic, locationLogic, 
+            lm, terms, stateData, transitionLogic, locationLogic,
             macroLogic, waypointLogic, itemTemplates);
     }
 

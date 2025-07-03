@@ -1,26 +1,28 @@
 {
   "type": "JsonLogic",
-  "configuration": {
-    "data": {
-      "rooms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/rooms.json",
-      "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/items.json",
-      "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/locations.json",
-      "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/transitions.json",
-      "pools": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/pools.json",
-      "costs": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/costs.json",
-      "logicSettings": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/logic_settings.json",
-      "starts": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/starts.json"
-    },
-    "logic": {
-      "terms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/terms.json",
-      "state": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/state.json",
-      "macros": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/macros.json",
-      "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/transitions.json",
-      "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/locations.json",
-      "waypoints": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/waypoints.json",
-      "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/items.json"
+  "configuration": [
+    {
+      "data": {
+        "rooms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/rooms.json",
+        "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/items.json",
+        "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/locations.json",
+        "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/transitions.json",
+        "pools": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/pools.json",
+        "costs": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/costs.json",
+        "logicSettings": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/logic_settings.json",
+        "starts": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Data/starts.json"
+      },
+      "logic": {
+        "terms": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/terms.json",
+        "state": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/state.json",
+        "macros": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/macros.json",
+        "transitions": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/transitions.json",
+        "locations": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/locations.json",
+        "waypoints": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/waypoints.json",
+        "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/items.json"
+      }
     }
-  },
+  ],
   "startStateTerm": "Start_State",
   "classifierModel": "./hkStateConfig.json",
   "emptyRegionsToKeep": [

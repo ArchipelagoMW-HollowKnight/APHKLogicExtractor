@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RandomizerCore;
 using RandomizerCore.Logic;
-using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
 using System.Reflection;
 
@@ -38,8 +37,9 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
 
             logger.LogInformation("Beginning item extraction");
             logger.LogInformation("Fetching logic");
-            JsonLogicConfiguration configuration = await input.Configuration.GetContent<JsonLogicConfiguration>();
-            
+            List<JsonLogicConfiguration> configs = await JsonLogicConfiguration.ParseManyAsync(input.Configuration);
+            JsonLogicConfiguration configuration = await JsonLogicConfiguration.MergeManyAsync(configs);
+
             logger.LogInformation("Preparing logic manager");
             LogicManagerContext ctx = await RcUtils.ConstructLogicManager(configuration);
             LogicManager lm = ctx.LogicManager;
@@ -82,7 +82,7 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
             logger.LogInformation("Collecting affected term maps");
             Dictionary<string, IReadOnlySet<string>> termsByItem = new();
             Dictionary<string, IReadOnlySet<string>> itemsByTerm = new();
-            foreach (var (name, effect) in progEffects)
+            foreach ((string name, IItemEffect effect) in progEffects)
             {
                 IReadOnlySet<string> affectedTerms = effect.GetAffectedTerms();
                 termsByItem[name] = affectedTerms;
@@ -132,7 +132,8 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                     {
                         throw new NotImplementedException("Stateful item effects are not yet supported");
                     }
-                    var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
+                    (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs)
+                        = clause.PartitionRequirements(lm);
                     branches.Add(new RequirementBranch(itemReqs, locationReqs, regionReqs, []));
                 }
                 IItemEffect? simplified = ConvertAndSimplifyEffect(lm, ce.Effect, ignoredTerms);
