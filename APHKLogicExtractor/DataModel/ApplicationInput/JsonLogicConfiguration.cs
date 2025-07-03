@@ -54,7 +54,7 @@ internal record JsonLogicConfiguration
                 JsonLogic src = config.Logic;
                 mergedLogic.Terms = await MergeMaybeFileDictListAsync(mergedLogic.Terms, src.Terms);
                 // TODO - address this!
-                if (src.State == null && mergedLogic.State != null)
+                if (src.State != null && mergedLogic.State != null)
                 {
                     throw new InvalidOperationException("Merging state definitions is not currently supported");
                 }
