@@ -87,6 +87,12 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 return;
             }
 
+            if (input.Type != InputType.JsonLogic)
+            {
+                logger.LogWarning("Data extractor is not supported for non-JSON input types");
+                return;
+            }
+
             logger.LogInformation("Beginning data extraction");
             List<JsonLogicConfiguration> configs = await JsonLogicConfiguration.ParseManyAsync(input.Configuration);
             JsonLogicConfiguration configuration = await JsonLogicConfiguration.MergeManyAsync(configs);

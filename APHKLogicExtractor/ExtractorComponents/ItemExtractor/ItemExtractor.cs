@@ -35,6 +35,12 @@ namespace APHKLogicExtractor.ExtractorComponents.ItemExtractor
                 return;
             }
 
+            if (input.Type != InputType.JsonLogic)
+            {
+                logger.LogWarning("Item extractor is not supported for non-JSON input types");
+                return;
+            }
+
             logger.LogInformation("Beginning item extraction");
             logger.LogInformation("Fetching logic");
             List<JsonLogicConfiguration> configs = await JsonLogicConfiguration.ParseManyAsync(input.Configuration);
