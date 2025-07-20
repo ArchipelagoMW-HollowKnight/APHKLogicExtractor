@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
+using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.DataModel;
 
@@ -14,7 +15,118 @@ internal record JsonLogicConfiguration
 
     public static async Task<List<JsonLogicConfiguration>> ParseManyAsync(MaybeFile<JToken> configFile)
     {
-        return await configFile.GetContent<List<JsonLogicConfiguration>>();
+        List<JsonLogicConfiguration> configs = await configFile.GetContent<List<JsonLogicConfiguration>>();
+        List<JsonLogicConfiguration> finalConfigs = [];
+        foreach (JsonLogicConfiguration conf in configs)
+        {
+            if (conf.Logic == null || (conf.Logic.Include == null && conf.Logic.Exclude == null))
+            {
+                finalConfigs.Add(conf);
+                continue;
+            }
+
+            List<RawWaypointDef> waypoints = [];
+            if (conf.Logic.Waypoints != null)
+            {
+                waypoints = await conf.Logic.Waypoints.GetContent();
+            }
+            Dictionary<string, RawWaypointDef> waypointLookup = waypoints.ToDictionary(w => w.name);
+
+            List<RawLogicDef> locations = [];
+            if (conf.Logic.Locations != null)
+            {
+                locations = await conf.Logic.Locations.GetContent();
+            }
+            Dictionary<string, RawLogicDef> locationLookup = locations.ToDictionary(l => l.name);
+
+            List<RawLogicDef> transitions = [];
+            if (conf.Logic.Transitions != null)
+            {
+                transitions = await conf.Logic.Transitions.GetContent();
+            }
+            Dictionary<string, RawLogicDef> transitionsLookup = transitions.ToDictionary(t => t.name);
+
+            HashSet<string> allNames = [.. waypointLookup.Keys, .. locationLookup.Keys, .. transitionsLookup.Keys];
+
+            HashSet<string> markedForRemoval = [];
+            if (conf.Logic?.Exclude != null)
+            {
+                HashSet<string> exclude = await conf.Logic.Exclude.GetContent();
+                markedForRemoval.UnionWith(exclude);
+            }
+            HashSet<string> seen = [];
+            Queue<string> toInclude = [];
+            if (conf.Logic?.Include != null)
+            {
+                HashSet<string> include = await conf.Logic.Include.GetContent();
+                foreach (string i in include)
+                {
+                    toInclude.Enqueue(i);
+                }
+                // mark for exclusion everything we know about that wasn't directly asked for.
+                // later steps may un-mark it if it's required in logic.
+                foreach (string n in allNames)
+                {
+                    if (!include.Contains(n))
+                    {
+                        markedForRemoval.Add(n);
+                    }
+                }
+            }
+
+            while (toInclude.Count > 0)
+            {
+                string next = toInclude.Dequeue();
+                markedForRemoval.Remove(next);
+                seen.Add(next);
+                string logicString;
+                if (waypointLookup.TryGetValue(next, out RawWaypointDef w))
+                {
+                    logicString = w.logic;
+                }
+                else if (locationLookup.TryGetValue(next, out RawLogicDef l))
+                {
+                    logicString = l.logic;
+                }
+                else if (transitionsLookup.TryGetValue(next, out RawLogicDef t))
+                {
+                    logicString = t.logic;
+                }
+                else
+                {
+                    continue;
+                }
+                // shared LP is not threadsafe so we have to take the overhead to make a new one every time
+                List<LogicToken> tokens = Infix.Tokenize(logicString, new LogicProcessor());
+                // enqueue only known location/waypoints from this logic block
+                //   * anything that isn't a location/waypoint doesn't need to be inspected because it's not a removal candidate
+                //   * anything that isn't part of this logic block isn't a removal candidate
+                foreach (string term in ExtractLikelyTerms(tokens))
+                {
+                    if (allNames.Contains(term) && !seen.Contains(term))
+                    {
+                        toInclude.Enqueue(term);
+                    }
+                }
+            }
+
+            JsonLogicConfiguration filteredConfig = new()
+            {
+                Data = conf.Data,
+                Logic = new()
+                {
+                    Terms = conf.Logic!.Terms,
+                    Items = conf.Logic!.Items,
+                    State = conf.Logic!.State,
+                    Macros = conf.Logic!.Macros,
+                    Waypoints = new([.. waypoints.Where(w => !markedForRemoval.Contains(w.name))]),
+                    Locations = new([.. locations.Where(l => !markedForRemoval.Contains(l.name))]),
+                    Transitions = new([.. transitions.Where(t => !markedForRemoval.Contains(t.name))]),
+                }
+            };
+            finalConfigs.Add(filteredConfig);
+        }
+        return finalConfigs;
     }
 
     public static async Task<JsonLogicConfiguration> MergeManyAsync(IEnumerable<JsonLogicConfiguration> configs)
@@ -191,6 +303,24 @@ internal record JsonLogicConfiguration
         MaybeFile<Dictionary<string, List<string>>> merged = new(dict);
         return merged;
     }
+
+    private static List<string> ExtractLikelyTerms(List<LogicToken> tokens)
+    {
+        return [.. tokens.SelectMany(ExtractLikelyTerms)];
+    }
+
+    private static List<string> ExtractLikelyTerms(LogicToken token)
+    {
+        return token switch
+        {
+            ProjectedToken p => ExtractLikelyTerms(p.Inner),
+            ReferenceToken r => [r.Target],
+            CoalescingToken c => [.. ExtractLikelyTerms(c.Left), .. ExtractLikelyTerms(c.Right)],
+            ComparisonToken c => [c.Left, c.Right],
+            SimpleToken s => [s.Name],
+            _ => []
+        };
+    }
 }
 
 internal record JsonData
@@ -214,4 +344,16 @@ internal record JsonLogic
     public MaybeFile<List<RawLogicDef>>? Locations { get; set; }
     public MaybeFile<List<RawWaypointDef>>? Waypoints { get; set; }
     public MaybeFile<List<StringItemTemplate>>? Items { get; set; }
+
+    /// <summary>
+    /// Locations and waypoints to be retained. Items not here are implicitly excluded. If an item is in both Includes
+    /// and Excludes, Includes takes precedence
+    /// </summary>
+    public MaybeFile<HashSet<string>>? Include { get; set; }
+    /// <summary>
+    /// Locations and waypoints to be removed. Items here may be retained if needed directly or indirectly by an included
+    /// item.
+    /// </summary>
+    public MaybeFile<HashSet<string>>? Exclude { get; set; }
+
 }

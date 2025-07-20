@@ -1,6 +1,4 @@
 using APHKLogicExtractor.DataModel;
-using APHKLogicExtractor.Loader;
-using Newtonsoft.Json.Linq;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
@@ -13,7 +11,7 @@ internal class RcUtils
     public static TermCollectionBuilder AssembleTerms(Dictionary<string, List<string>> terms)
     {
         TermCollectionBuilder termsBuilder = new();
-        foreach (var (type, termsOfType) in terms)
+        foreach ((string type, List<string> termsOfType) in terms)
         {
             TermType termType = (TermType)Enum.Parse(typeof(TermType), type);
             foreach (string term in termsOfType)

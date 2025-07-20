@@ -21,6 +21,16 @@
         "waypoints": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/waypoints.json",
         "items": "https://raw.githubusercontent.com/homothetyhk/RandomizerMod/master/RandomizerMod/Resources/Logic/items.json"
       }
+    },
+    {
+      "logic": {
+        "terms": "https://raw.githubusercontent.com/BadMagic100/TheRealJournalRando/refs/heads/master/TheRealJournalRando/Resources/Logic/terms.json",
+        "macros": "https://raw.githubusercontent.com/BadMagic100/TheRealJournalRando/refs/heads/master/TheRealJournalRando/Resources/Logic/macros.json",
+        "waypoints": "https://raw.githubusercontent.com/BadMagic100/TheRealJournalRando/refs/heads/master/TheRealJournalRando/Resources/Logic/waypoints.json",
+        "include": [
+          "Defeated_Pantheon_5"
+        ]
+      }
     }
   ],
   "startStateTerm": "Start_State",
