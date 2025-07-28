@@ -6,19 +6,17 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 {
     internal class IdFactory(ILogger<IdFactory> logger)
     {
-        public async Task<Dictionary<string, long>> CreateIds(uint connectionId, IEnumerable<string> values, Dictionary<string, int> multiplicity)
-        {
-            // upper bound id is 2**53 - 1 and the lower order 32 bits are for the generated id, which gives
-            // us the other 21
-            const uint upperBoundConnectionId = (1 << 21) - 1;
+        // we are using a ushort (16 bits) for connection IDs. Since IDs must be <2^53, we have 53 bits to work with
+        // (don't forget 2^0 takes a bit) and 53-16 is 37.
+        const int ITEM_BITS = 37;
 
-            if (connectionId > upperBoundConnectionId)
-            {
-                throw new ArgumentException($"Connection ID cannot be larger than {upperBoundConnectionId}", nameof(connectionId));
-            }
+        public async Task<Dictionary<string, long>> CreateIds(ushort connectionId, IEnumerable<string> values, Dictionary<string, int> multiplicity)
+        {
+            long connectionMask = connectionId << ITEM_BITS;
+            long idMask = (1 << ITEM_BITS) - 1;
 
             // cheating our duplicate detection a bit here - 0 is reserved so treat it as already chosen (by someone else)
-            HashSet<uint> selectedIds = [0];
+            HashSet<long> selectedIds = [0];
             Dictionary<string, long> nameToIdMapping = [];
             IEnumerable<string> valuesWithMultiplicity = values.SelectMany(v =>
             {
@@ -37,16 +35,28 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 byte[] valBytes = Encoding.UTF8.GetBytes(val);
                 using MemoryStream ms = new(valBytes);
                 byte[] hash = await md5.ComputeHashAsync(ms);
-                // ensure little endian byte order - most modern architectures are little endian
-                // so this was chosen as the common denominator
-                if (!BitConverter.IsLittleEndian)
+                long proposedId = 0;
+                int bitsRemaining = ITEM_BITS;
+                for (int i = 0; bitsRemaining > 0; i++)
                 {
-                    Array.Reverse(hash);
+                    int bitsToFetch = Math.Min(bitsRemaining, 8);
+                    // 1. bitmask for the lower n bits, 2^n - 1
+                    byte mask = (byte)((1 << bitsToFetch) - 1);
+                    // 2. get the bits
+                    byte bitsFromHash = (byte)(hash[i] & mask);
+                    // 3. make space and add the bits
+                    proposedId = (proposedId << bitsToFetch) | bitsFromHash;
+                    bitsRemaining -= bitsToFetch;
                 }
-                uint proposedId = BitConverter.ToUInt32(hash, 0);
-                uint finalId = Deduplicate(selectedIds, proposedId);
+                // sanity check - we should have exactly spent all the bits available
+                if (bitsRemaining != 0)
+                {
+                    logger.LogError("Overspent bits during ID generation");
+                }
+
+                long finalId = Deduplicate(selectedIds, proposedId);
                 selectedIds.Add(finalId);
-                long compositeId = ((long)connectionId << 32) | finalId;
+                long compositeId = idMask | finalId;
                 nameToIdMapping.Add(val, compositeId);
             }
             // sanity check - all ids should be unique
@@ -54,10 +64,19 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             {
                 logger.LogError("Generated duplicate IDs for connection ID {}", connectionId);
             }
+            // sanity check - all ids should be 0 < x <2^53
+            foreach (KeyValuePair<string, long> pair in nameToIdMapping)
+            {
+                if (pair.Value < 1 || (1L << 53) < pair.Value)
+                {
+                    logger.LogError("ID {} for item {} in connection {} was outside the expected range", pair.Value, pair.Key, connectionId);
+                }
+            }
+
             return nameToIdMapping;
         }
 
-        private uint Deduplicate(HashSet<uint> selectedIds, uint newId)
+        private long Deduplicate(HashSet<long> selectedIds, long newId)
         {
             while (selectedIds.Contains(newId))
             {
