@@ -28,6 +28,8 @@
         "macros": "https://raw.githubusercontent.com/BadMagic100/TheRealJournalRando/refs/heads/master/TheRealJournalRando/Resources/Logic/macros.json",
         "waypoints": "https://raw.githubusercontent.com/BadMagic100/TheRealJournalRando/refs/heads/master/TheRealJournalRando/Resources/Logic/waypoints.json",
         "include": [
+          "Defeated_Any_Hollow_Knight",
+          "Defeated_Any_Radiance",
           "Defeated_Pantheon_5"
         ]
       }
