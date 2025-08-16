@@ -51,22 +51,24 @@ The configuration has the following structure:
 - `Configuration`: **Required.** The format and content of this field is determined by the value of `Type`:
   - For `JsonLogic`, provide a logic configuration as described above.
   - For `RandoContext`, provide a serialized RandoContext.
-  - For `WorldDefinition`, provide a `StringWorldDefinition` object. This should be a JSON object with a property like `LogicObjects`, which is a list of objects with the following structure:
+  - For `WorldDefinition`, provide a `StringWorldDefinition` object. This should be a JSON object with the following structure:
     ```json
-    [
-      {
-        "Name": "RegionOrLocationName",
-        "Handling": "Default | Location | Transition",
-        "IsEvent": true,
-        "Clauses": [
-          {
-            "StateProvider": "optional state term",
-            "Conditions": ["Term1", "Term2"],
-            "StateModifiers": ["$BENCHRESET", "$TAKEDAMAGE"]
-          }
-        ]
-      }
-    ]
+    {
+      "LogicObjects": [
+        {
+          "Name": "RegionOrLocationName",
+          "Handling": "Default | Location | Transition",
+          "IsEvent": true,
+          "Clauses": [
+            {
+              "StateProvider": "optional state term",
+              "Conditions": ["Term1", "Term2"],
+              "StateModifiers": ["$BENCHRESET", "$TAKEDAMAGE"]
+            }
+          ]
+        }
+      ]
+    }
     ```    
     - **Name**: Unique string identifier for the region, location, or transition.
     - **Handling**: Specifies how the object is treated (`Default` for regions, `Location` for locations/events, `Transition` for transitions).
