@@ -11,7 +11,7 @@
     "$SPENDSOUL",
     "$TAKEDAMAGE",
     "$LIFEBLOOD",
-    "$EQUIPCHARM",
+    "$EQUIPPEDCHARM",
     "$STAGSTATEMODIFIER"
   ],
   "OtherModifiers": [
