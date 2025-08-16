@@ -1,101 +1,100 @@
 # APHKLogicExtractor
 
-Command line application for extracting RandomizerCore logic to Archipelago structures. It is comprised of multiple
-component jobs which run in parallel.
+Command line application for extracting RandomizerCore logic to Archipelago structures. It processes multiple component jobs in parallel
+to generate region definitions, item effects, and related data.
 
-* [General command line arguments](#general-command-line-arguments)
-* [Region extractor](#region-extractor)
-    + [Loading HK logic from upstream](#loading-hk-logic-from-upstream)
-    + [Loading RandomizerCore logic from a locally serialized RandoContext](#loading-randomizercore-logic-from-a-locally-serialized-randocontext)
-    + [Loading non-RandomizerCore logic from a local world definition](#loading-non-randomizercore-logic-from-a-local-world-definition)
-    + [Modifying reduction of state modifiers](#modifying-reduction-of-state-modifiers)
+## Command Line Arguments
 
-## General command line arguments
+- `--Input` (required): Path to the input configuration file in JSON format
+- `--Output`: Directory path for output files (default: `./output`)
+- `--Jobs`: Space-separated list of jobs to run. Valid values: `ExtractItems`, `ExtractRegions`, `ExtractData`. When 
+  omitted, all jobs will run
+- `--IgnoreCache`: When true, bypasses the resource cache and forces fresh downloads/reads
+- `--Bundle`: When true, bundles the output folder into a zip file
 
-The command line argument `--Output` can be used to specify a folder path to place output files. The default is `./output`.
+## Input Configuration
 
-The command line argument `--Jobs` can be specified multiple times. `ExtractItems` and `ExtractRegions` are valid values. When not specified,
-all jobs will be run.
+The input configuration file specified by `--Input` contains settings for the extraction process. It uses a flexible resource system that supports:
+- Absolute or relative file paths (e.g. `./path/to/file.json` or `C:/path/to/file.json`)
+- HTTP/HTTPS URLs (e.g. `https://example.com/data.json`)
+- Raw JSON content inline
 
-## Region extractor
+The configuration has the following structure:
+```json
+{
+  "Type": "JsonLogic | RandoContext | WorldDefinition",
+  "Configuration": {
+    // Logic configuration content or reference
+  },
+  "StartStateTerm": "optional term to use as menu region",
+  "ClassifierModel": {
+    // State modifier classification rules or reference 
+  },
+  "EmptyRegionsToKeep": [
+    // List of region names to preserve or reference
+  ],
+  "IgnoredTerms": [
+    // List of terms to ignore in logic or reference
+  ],
+  "IgnoredItems": [
+    // List of items to ignore or reference
+  ]
+}
+```
 
-The region extractor is able to take string logic as an input (a variety of formats are possible) and outputs a JSON
-file with all the information necessary to construct Archipelago regions and locations. The output contains:
+### Configuration Properties
 
-* Regions - a list of regions to create. Each region has the following properties:
-    * Name - The name of the region. Menu is included
-    * Exits - A list of exits from the region. Each exit contains:
-        * Target - the name of the target region
-        * Logic - a list of logic requirements (explained below).
-    * Locations - A list of location names which appear in the region
-    * Transitions - A list of randomizable transition names which appear in the region
-* Locations - A list of locations to create. Event locations may be included. Each location has the following properties:
-    * Name - The name of the location
-    * Logic - a list of logic requirements (explained below)
-* Transitions - A list logic for randomizable transitions (i.e. edges not included in the region graph by default which need
-  to be added in order to complete the graph, or randomize for ER). Note also that special care should be taken for one-way
-  entrances; a transition may appear in this list even if it cannot be used as an exit, and this data alone must be supplemented
-  in order to determine the correct handling. Each transition has the following properties:
-    * Name - the name of the transition
-    * Logic - a list of logic requirements (explained below)
+- `Type`: **Required.** Determines the expected format of the `Configuration` field:
+  - `JsonLogic`: Expects a HK-style JSON logic definition. The configuration should be a JSON object or reference containing logic, items, terms, waypoints, locations, transitions, etc.
+  - `RandoContext`: Expects a serialized RandomizerCore RandoContext object. The configuration should be a JSON object or reference containing a saved RandoContext.
+  - `WorldDefinition`: Expects a custom string-based world definition. The configuration should be a JSON object or reference containing a list of logic objects, each with a name, handling type, and logic clauses.
+- `Configuration`: **Required.** The format and content of this field is determined by the value of `Type`:
+  - For `JsonLogic`, provide a logic configuration as described above.
+  - For `RandoContext`, provide a serialized RandoContext.
+  - For `WorldDefinition`, provide a `StringWorldDefinition` object. This should be a JSON object with a property like `LogicObjects`, which is a list of objects with the following structure:
+    ```json
+    [
+      {
+        "Name": "RegionOrLocationName",
+        "Handling": "Default | Location | Transition",
+        "IsEvent": true,
+        "Clauses": [
+          {
+            "StateProvider": "optional state term",
+            "Conditions": ["Term1", "Term2"],
+            "StateModifiers": ["$BENCHRESET", "$TAKEDAMAGE"]
+          }
+        ]
+      }
+    ]
+    ```    
+    - **Name**: Unique string identifier for the region, location, or transition.
+    - **Handling**: Specifies how the object is treated (`Default` for regions, `Location` for locations/events, `Transition` for transitions).
+    - **IsEvent**: Boolean indicating if the object is an event.
+    - **Clauses**: List of logic clauses in Disjunctive Normal Form (DNF). Each clause may specify a state provider, a set of conditions, and an ordered list of state modifiers.
 
-The extractor job also generates a GraphViz dot file which can be used to visualize the created region graph (you'll want to export
-as svg to prevent compression).
+- `StartStateTerm`: Optional. When specified, this term becomes the menu region.
+- `ClassifierModel`: Optional. Rules for classifying state modifiers as beneficial or detrimental. See [State Classification](#state-classification) below.
+- `EmptyRegionsToKeep`: Optional. List of region names that should not be removed during optimization.
+- `IgnoredTerms`: Optional. List of terms to exclude from item effect processing.
+- `IgnoredItems`: Optional. List of items to exclude from processing
 
-Logic requirements are always presented as a list of alternatives. In other words, in Archipelago, after modeling each requirement
-object, the access rule for an Entrance/Location can be checked as `all(lambda req: req.satisfied(state), logic)`. Each requirement
-contains a set of item requirements (`state.has(item, player)`, possibly with a count for comparisons), a set of location requirements
-(`state.can_reach(location, resolution_hint="Location", player=player)`), and an ordered list of state modifiers to apply. For more
-information on state logic, see the [RandomizerCore documentation](https://homothetyhk.github.io/RandomizerCore/articles/state.html).
+### State Classification
 
-### Keeping empty regions for organizational purposes
+State modifiers can be classified to optimize the processing of [state logic](https://homothetyhk.github.io/RandomizerCore/articles/state.html).
+The classification model defines which modifiers are:
+- Beneficial (e.g., gaining soul, bench rests)
+- Detrimental (e.g., taking damage, spending soul)  
+- Mixed effects (improving some states while worsening others)
 
-By default, the extractor will attempt to remove any redundant empty regions. If maintaining certain regions is desirable for
-organization (such as HK's Can_Bench and Can_Stag regions which have many entrances and exits which would be expensive to distribute),
-the `--EmptyRegionsToKeepPath` argument can be used. This should be a path to a JSON file containing a list of strings (region names)
-which should not be removed during this process. You can see an example of this for HK 
-[here](https://github.com/ArchipelagoMW-HollowKnight/APHKLogicExtractor/blob/master/APHKLogicExtractor/hkEmptyRegionsToKeep.json)
 
-### Loading HK logic from upstream
+See [hkStateConfig.json](https://github.com/ArchipelagoMW-HollowKnight/APHKLogicExtractor/blob/master/APHKLogicExtractor/hkStateConfig.json) for a complete example.
 
-By default, when the extractor is run with no command line arguments, logic will be automatically pulled from the RandomizerMod repository
-on the main branch. If needed, a specific git ref can be set with the argument `--RefName`.
+## Output
 
-### Loading RandomizerCore logic from a locally serialized RandoContext
-
-Logic can be loaded from a locally serialized RandoContext object created by the RandomizerCore.Json library. This can be
-used for any RandomizerCore randomizer, including Hollow Knight with a non-default LogicManager (e.g. with connections enabled).
-Specify the path to the JSON file with the argument `--RandoContextPath`. To ensure good results, warnings for ambiguous, missing,
-or poorly ordered state providers should be resolved.
-
-### Loading non-RandomizerCore logic from a local world definition
-
-Logic can be loaded from a locally serialized `StringWorldDefinition`, which contains a list of string logic objects. This
-approach allows other non-graph-based randomizers to leverage the region construction logic with only minimal preprocessing.
-
-Locations, Waypoints/Events, and Transitions should all appear in the input list. Each input should contain the following properties:
-* Name - a string representing the name of the object. Names should be unique.
-* Handling - one of "Default", "Location", or "Transition"
-    * Default handling will create the object as a region only. This is useful for state-transmitting waypoints.
-    * Location handling will create the object as a region, and a location contained within that region. This is useful for
-      stateless waypoints (events with saved effects) or actual locations.
-    * Transition handling will create the object as a region, and create a record of a randomizable transition there.
-* Logic - a list of state-aware logic clauses after expanding logic to Disjunctive Normal Form (DNF). Each token should be parseable
-  as a RandomizerCore TermToken. For most games this will not be an issue as long as [safe naming practices](https://homothetyhk.github.io/RandomizerCore/articles/safe_naming.html)
-  are followed. Each clause should contain:
-    * StateProvider (optional) - The state-providing token of the clause. If your logic system does not have a construct similar to
-      RandomizerCore state, this is usually just the transition used in the logic clause. For example, in an access rule 
-      `SomeRoom[left] + DoubleJump`, `SomeRoom[left1]` should be the state provider. The state provider's region will become the
-      parent region before simplification. In rare cases, a StateProvider may not be present in a clause; in this case the parent
-      region will be the Menu region.
-    * Conditions (required, may be empty) - A set of boolean condition tokens.
-    * StateModifiers (required, may be empty) - An ordered list of state modifier tokens.
-
-### Modifying reduction of state modifiers
-
-As part of the process of merging logic objects, redundant logic branches are removed. When state modifiers are involved, redundancy
-hinges on whether a branch has "better" state modifiers than another branch, in addition to having fewer non-state requirements.
-State modifiers may strictly improve state, strictly worsen state, or improve some fields and worsen some fields. By default, it is
-assumed that all state modifiers are "mixed" quality, and thus logic containing state modifiers is never redundant. This can be changed
-by providing the `--ClassfierModelPath` option. Without going too in-depth, this is modeled by the `StateClassificationModel` class.
-You can see an example of this for HK [here](https://github.com/ArchipelagoMW-HollowKnight/APHKLogicExtractor/blob/master/APHKLogicExtractor/hkStateConfig.json).
+The extractor generates several files containing:
+- Region definitions and connections
+- Location and transition logic
+- Item effects and requirements
+- Constants and enums
+- A GraphViz visualization of the region graph
