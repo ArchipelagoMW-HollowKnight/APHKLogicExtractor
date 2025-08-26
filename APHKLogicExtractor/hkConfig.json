@@ -42,7 +42,12 @@
     "Can_Bench"
   ],
   "ignoredTerms": [
+    "PALEORE",
     "GEO",
+    "WANDERERSJOURNALS",
+    "HALLOWNESTSEALS",
+    "KINGSIDOLS",
+    "ARCANEEGGS",
     "JOURNAL",
     "QUILL",
     "MAPS",
@@ -59,7 +64,8 @@
     "Crystal_Peak_Map",
     "Queen's_Gardens_Map",
     "Resting_Grounds_Map",
-    "Collector's_Map"
+    "Collector's_Map",
+    "World_Sense"
   ],
   "ignoredItems": [
     "Split_Shade_Cloak",
