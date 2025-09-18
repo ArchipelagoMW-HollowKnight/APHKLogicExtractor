@@ -38,13 +38,7 @@ namespace APHKLogicExtractor.ExtractorComponents
             WriteHeader(writer);
 
             writer.WriteLine("""
-                try:
-                    from enum import StrEnum
-                except ImportError:
-                    from enum import Enum
-
-                    class StrEnum(str, Enum):
-                        pass
+                from enum import StrEnum
 
                 """);
             writer.WriteLine();
