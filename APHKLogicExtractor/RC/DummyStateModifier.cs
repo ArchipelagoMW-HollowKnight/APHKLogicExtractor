@@ -3,11 +3,11 @@ using RandomizerCore.Logic.StateLogic;
 
 namespace APHKLogicExtractor.RC
 {
-    internal class DummyVariable : StateModifier, IStateProvider
+    internal class DummyStateModifier : StateModifier
     {
         public override string Name { get; }
 
-        public DummyVariable(string name)
+        public DummyStateModifier(string name)
         {
             Name = name;
         }
@@ -20,11 +20,6 @@ namespace APHKLogicExtractor.RC
         public override IEnumerable<LazyStateBuilder> ModifyState(object? sender, ProgressionManager pm, LazyStateBuilder state)
         {
             yield return state;
-        }
-
-        public StateUnion? GetInputState(object? sender, ProgressionManager pm)
-        {
-            throw new NotImplementedException();
         }
     }
 }

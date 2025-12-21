@@ -67,9 +67,11 @@ internal class RcUtils
             itemTemplates = await configuration.Logic.Items.GetContent();
         }
 
-        LogicManagerBuilder lmb = new() { VariableResolver = new DummyVariableResolver() };
-        lmb.LP.SetMacro(macroLogic);
-        lmb.StateManager.AppendRawStateData(stateData);
+        LogicManagerBuilder lmb = new() { VariableResolver = new DummyVariableResolver(stateData) };
+        foreach (KeyValuePair<string, string> macro in macroLogic)
+        {
+            lmb.AddMacro(macro);
+        }
         foreach (Term term in terms)
         {
             lmb.GetOrAddTerm(term.Name, term.Type);
