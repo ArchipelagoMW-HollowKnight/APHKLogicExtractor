@@ -6,7 +6,7 @@ using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.DataModel
 {
-    internal class StatefulClause
+    internal class StatefulClause : IEquatable<StatefulClause>
     {
         public TermToken? StateProvider { get; }
         public IReadOnlySet<TermToken> Conditions { get; }
@@ -144,8 +144,6 @@ namespace APHKLogicExtractor.DataModel
             return $"({inner})";
         }
 
-
-
         public (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs)
             PartitionRequirements(LogicManager? lm)
         {
@@ -189,6 +187,45 @@ namespace APHKLogicExtractor.DataModel
                 }
             }
             return (items, locations, regions);
+        }
+
+        public bool Equals(StatefulClause? other)
+        {
+            if (other == null)
+            {
+                return false;
+            }
+
+            if (StateProvider != other.StateProvider)
+            {
+                return false;
+            }
+
+            if (Conditions.Count != other.Conditions.Count)
+            {
+                return false;
+            }
+            foreach (TermToken cond in Conditions)
+            {
+                if (!other.Conditions.Contains(cond))
+                {
+                    return false;
+                }
+            }
+
+            if (StateModifiers.Count != other.StateModifiers.Count)
+            {
+                return false;
+            }
+            for (int i = 0; i < StateModifiers.Count; i++)
+            {
+                if (StateModifiers[i] != other.StateModifiers[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

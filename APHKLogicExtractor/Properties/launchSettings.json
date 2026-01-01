@@ -2,7 +2,7 @@
   "profiles": {
     "APHKLogicExtractor": {
       "commandName": "Project",
-      "commandLineArgs": "--Input ./hkConfig.json --IgnoreCache --Bundle"
+      "commandLineArgs": "--Input ./hkConfig.json --IgnoreCache --Jobs ExtractRegions --Bundle"
     }
   }
 }
