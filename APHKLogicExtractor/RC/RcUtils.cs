@@ -115,20 +115,6 @@ internal class RcUtils
 
     public static List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd, ILogger? logger = null)
     {
-        if (dd.Name == "Nightmare_Lantern_Lit" || dd.Name == "Defeated_Any_Soul_Warrior" || dd.Name == "Opened_Shaman_Pillar")
-        {
-        }
-
-        TermToken CorrectSimpleTokenShouldBeComparison(TermToken orig)
-        {
-            if (orig is SimpleToken st && (st.Name.Contains('=') || st.Name.Contains('>') || st.Name.Contains('<')))
-            {
-                logger?.LogWarning("Attempting to convert SimpleToken {0} to comparison", st.Name);
-                return Utils.ParseSingleToken(st.Name);
-            }
-            return orig;
-        }
-
         // remove FALSE clauses, and remove TRUE from all clauses
         IEnumerable<IEnumerable<TermToken>> clauses = dd.ToTermTokenSequences()
             .Where(x => !x.Contains(ConstToken.False));
@@ -136,7 +122,7 @@ internal class RcUtils
         {
             return [new StatefulClause(null, new HashSet<TermToken>(1) { ConstToken.False }, [])];
         }
-        List<StatefulClause> originalImplClauses = [.. clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True).Select(CorrectSimpleTokenShouldBeComparison)))];
+        List<StatefulClause> originalImplClauses = [.. clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True)))];
 
         static string WriteTermReqAsComparison(TermValue t)
         {
