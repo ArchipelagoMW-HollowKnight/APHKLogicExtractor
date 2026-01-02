@@ -23,27 +23,27 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 
         public StateModifierKind ClassifySingle(string token)
         {
-            return ClassifySingle(Utils.ParseSingleToken(token));
+            return ClassifySingle(LogicExpressionUtil.Parse(token));
         }
 
         public StateModifierKind ClassifyMany(IEnumerable<string> tokens)
         {
-            return ClassifyMany(tokens.Select(Utils.ParseSingleToken));
+            return ClassifyMany(tokens.Select(LogicExpressionUtil.Parse));
         }
 
-        public StateModifierKind ClassifySingle(TermToken token)
+        public StateModifierKind ClassifySingle(Expr expr)
         {
-            if (token is ComparisonToken)
+            if (expr is ComparisonExpression)
             {
                 // comparisons to state fields can never be beneficial, but may not always be detrimental
                 return StateModifierKind.Mixed;
             }
-            if (token is not SimpleToken st)
+            if (expr is not Atom a)
             {
                 return StateModifierKind.Mixed;
             }
 
-            (string prefix, string[] args) = prefixParser.Parse(st.Name);
+            (string prefix, string[] args) = prefixParser.Parse(a.Print());
             foreach (ArgumentClassifier argumentClassifier in classificationModel.ArgumentClassifiers ?? [])
             {
                 if (argumentClassifier.Matches(prefix, args))
@@ -63,12 +63,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return StateModifierKind.Mixed;
         }
 
-        public StateModifierKind ClassifyMany(IEnumerable<TermToken> tokens)
+        public StateModifierKind ClassifyMany(IEnumerable<Expr> exprs)
         {
             StateModifierKind aggregated = StateModifierKind.None;
-            foreach (TermToken token in tokens)
+            foreach (Expr expr in exprs)
             {
-                StateModifierKind kind = ClassifySingle(token);
+                StateModifierKind kind = ClassifySingle(expr);
                 if (kind == StateModifierKind.Beneficial && aggregated == StateModifierKind.Detrimental)
                 {
                     return StateModifierKind.Mixed;

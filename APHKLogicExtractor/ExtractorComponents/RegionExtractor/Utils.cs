@@ -1,20 +1,9 @@
 ﻿using APHKLogicExtractor.DataModel;
-using RandomizerCore.StringLogic;
 
 namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
 {
     internal static class Utils
     {
-        public static TermToken ParseSingleToken(string token)
-        {
-            List<LogicToken> tokens = Infix.Tokenize(token);
-            if (tokens.Count != 1 || tokens[0] is not TermToken tt)
-            {
-                throw new ArgumentException($"Logic string {token} must consist of a single TermToken.", nameof(token));
-            }
-            return tt;
-        }
-
         public static bool HasSublistWithAdditionalModifiersOfKind(
             IReadOnlyList<string> list,
             IReadOnlyList<string> sublist,

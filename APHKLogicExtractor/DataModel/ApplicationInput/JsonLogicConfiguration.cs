@@ -5,6 +5,7 @@ using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
 using RandomizerCore.StringLogic;
+using RandomizerCore.StringParsing;
 
 namespace APHKLogicExtractor.DataModel;
 
@@ -96,12 +97,11 @@ internal record JsonLogicConfiguration
                 {
                     continue;
                 }
-                // shared LP is not threadsafe so we have to take the overhead to make a new one every time
-                List<LogicToken> tokens = Infix.Tokenize(logicString, new LogicProcessor());
+                Expr expr = LogicExpressionUtil.Parse(logicString);
                 // enqueue only known location/waypoints from this logic block
                 //   * anything that isn't a location/waypoint doesn't need to be inspected because it's not a removal candidate
                 //   * anything that isn't part of this logic block isn't a removal candidate
-                foreach (string term in ExtractLikelyTerms(tokens))
+                foreach (string term in ExtractTermAtoms(expr))
                 {
                     if (allNames.Contains(term) && !seen.Contains(term))
                     {
@@ -304,20 +304,16 @@ internal record JsonLogicConfiguration
         return merged;
     }
 
-    private static List<string> ExtractLikelyTerms(List<LogicToken> tokens)
+    private static List<string> ExtractTermAtoms(Expr expr)
     {
-        return [.. tokens.SelectMany(ExtractLikelyTerms)];
-    }
-
-    private static List<string> ExtractLikelyTerms(LogicToken token)
-    {
-        return token switch
+        return expr switch
         {
-            ProjectedToken p => ExtractLikelyTerms(p.Inner),
-            ReferenceToken r => [r.Target],
-            CoalescingToken c => [.. ExtractLikelyTerms(c.Left), .. ExtractLikelyTerms(c.Right)],
-            ComparisonToken c => [c.Left, c.Right],
-            SimpleToken s => [s.Name],
+            GroupingExpression<LogicExpressionType> g => ExtractTermAtoms(g.Nested),
+            PrefixExpression<LogicExpressionType> p => ExtractTermAtoms(p.Operand),
+            PostfixExpression<LogicExpressionType> p => ExtractTermAtoms(p.Operand),
+            InfixExpression<LogicExpressionType> p => [.. ExtractTermAtoms(p.Left), .. ExtractTermAtoms(p.Right)],
+            LogicAtomExpression s => [s.Print()],
+            // numeric/bool/null atoms deliberately ignored
             _ => []
         };
     }

@@ -37,14 +37,14 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             foreach (StatefulClause clause in logicObject.Logic)
             {
-                if (clause.Conditions.Contains(ConstToken.False))
+                if (clause.Conditions.Any(c => c is BoolLiteralExpression { ConstValue: false } or NumberLiteralExpression { ConstValue: 0 }))
                 {
                     // this clause will never be reachable so ignore it
                     continue;
                 }
                 string parentName = GetRegionName(clause.StateProvider);
                 Region parent = regions.GetValueOrDefault(parentName) ?? AddRegion(parentName);
-                var (itemReqs, locationReqs, regionReqs) = clause.PartitionRequirements(lm);
+                (HashSet<string>? itemReqs, HashSet<string>? locationReqs, HashSet<string>? regionReqs) = clause.PartitionRequirements(lm);
 
                 if (logicObject.Handling == LogicHandling.Transition && parent == r)
                 {
@@ -54,11 +54,11 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                         itemReqs,
                         locationReqs,
                         regionReqs,
-                        clause.StateModifiers.Select(c => c.Write()).ToList()));
+                        [.. clause.StateModifiers.Select(c => c.Print())]));
                     continue;
                 }
 
-                parent.Connect(itemReqs, locationReqs, regionReqs, clause.StateModifiers.Select(c => c.Write()), r);
+                parent.Connect(itemReqs, locationReqs, regionReqs, clause.StateModifiers.Select(c => c.Print()), r);
             }
         }
 
@@ -150,12 +150,12 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             return t;
         }
 
-        private string GetRegionName(TermToken? token) => token switch
+        private string GetRegionName(Expr? expr) => expr switch
         {
             null => "Menu",
-            SimpleToken st => st.Name,
-            ReferenceToken rt => rt.Target,
-            _ => throw new InvalidOperationException($"Tokens of type {token.GetType().FullName} are not valid region parents")
+            Atom a => a.Print(),
+            ReferenceExpression { Operand: Atom a } => a.Print(),
+            _ => throw new InvalidOperationException($"Expressions of type {expr.GetType().FullName} are not valid region parents")
         };
 
         private void Validate()
@@ -473,9 +473,9 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             RemoveRegion(region.Name);
 
             // surely this will have no negative performance implications
-            foreach (var (parent, entrance) in entrances)
+            foreach ((Region? parent, Connection? entrance) in entrances)
             {
-                foreach (var exit in exits)
+                foreach (Connection exit in exits)
                 {
                     List<RequirementBranch> newBranches = DistributeBranches(entrance.Logic, exit.Logic);
                     // in a self-cycle, any non-state-modifying branches are redundant (you cannot get to yourself without yourself).

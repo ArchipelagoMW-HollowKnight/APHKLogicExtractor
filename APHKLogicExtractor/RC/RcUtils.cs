@@ -1,7 +1,5 @@
 using APHKLogicExtractor.DataModel;
-using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
 using Microsoft.Extensions.Logging;
-using RandomizerCore;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
@@ -115,58 +113,13 @@ internal class RcUtils
 
     public static List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd, ILogger? logger = null)
     {
-        // remove FALSE clauses, and remove TRUE from all clauses
-        IEnumerable<IEnumerable<TermToken>> clauses = dd.ToTermTokenSequences()
-            .Where(x => !x.Contains(ConstToken.False));
-        if (!clauses.Any())
-        {
-            return [new StatefulClause(null, new HashSet<TermToken>(1) { ConstToken.False }, [])];
-        }
-        List<StatefulClause> originalImplClauses = [.. clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True)))];
-
-        static string WriteTermReqAsComparison(TermValue t)
-        {
-            if (t.Value < 1)
-            {
-                throw new ArgumentException("Term requirements should be at least 1", nameof(t));
-            }
-            if (t.Value == 1)
-            {
-                return t.Term.Name;
-            }
-            return $"{t.Term.Name}>{t.Value - 1}";
-        }
-
+        LogicExpressionBuilder builder = new();
         List<DNFLogicDef.ReadOnlyConjunction> conjunctions = [.. dd.GetAllConjunctions()];
-        List<StatefulClause> newImplClauses = [.. conjunctions.Select(c => new StatefulClause(
-            c.StateProvider == null ? null : Utils.ParseSingleToken(c.StateProvider.Name),
-            c.TermReqs.Select(WriteTermReqAsComparison).Concat(c.VarReqs.Select(v => v.Name)).Select(Utils.ParseSingleToken).ToHashSet(),
-            [.. c.StateModifiers.Select(m => m.Name).Select(Utils.ParseSingleToken)]))];
-
-        if (originalImplClauses.Count != newImplClauses.Count)
+        if (conjunctions.Count == 0)
         {
-            logger?.LogWarning(
-                "Logic def {0} did not match between implementations; expected {1} conjunctions but got {2}",
-                dd.Name,
-                originalImplClauses.Count,
-                newImplClauses.Count);
-        }
-        else
-        {
-            for (int i = 0; i < originalImplClauses.Count; i++)
-            {
-                if (!originalImplClauses[i].Equals(newImplClauses[i]))
-                {
-                    logger?.LogWarning(
-                        "Logic def {0} did not match between implementations; expected {1} at conjunction {2} but got {3}",
-                        dd.Name,
-                        originalImplClauses[i],
-                        i,
-                        newImplClauses[i]);
-                }
-            }
+            return [new StatefulClause(null, new HashSet<Expression<LogicExpressionType>>(1) { builder.NameAtom("NONE") }, [])];
         }
 
-        return originalImplClauses;
+        return [.. conjunctions.Select(c => new StatefulClause(lm, c))];
     }
 }
