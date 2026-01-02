@@ -1,4 +1,4 @@
 ﻿namespace APHKLogicExtractor.DataModel.DataExtractor
 {
-    internal record IdData(Dictionary<string, long> itemNameToId, Dictionary<string, long> locationNameToId);
+    internal record IdData(Dictionary<string, int> itemNameToId, Dictionary<string, int> locationNameToId);
 }

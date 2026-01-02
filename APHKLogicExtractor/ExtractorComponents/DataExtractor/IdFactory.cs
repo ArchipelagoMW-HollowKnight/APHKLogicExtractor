@@ -6,18 +6,18 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
 {
     internal class IdFactory(ILogger<IdFactory> logger)
     {
-        // we are using a ushort (16 bits) for connection IDs. Since IDs must be <2^53, we have 53 bits to work with
-        // (don't forget 2^0 takes a bit) and 53-16 is 37.
-        const int ITEM_BITS = 37;
+        // we are using a byte (8 bits) for connection IDs. Since IDs must be <=int.Max (2^31 - 1) we get 31 bits
+        // (don't forget 2^0 takes a bit) and 31-8 is 23.
+        const int ITEM_BITS = 23;
 
-        public async Task<Dictionary<string, long>> CreateIds(ushort connectionId, IEnumerable<string> values, Dictionary<string, int> multiplicity)
+        public async Task<Dictionary<string, int>> CreateIds(byte connectionId, IEnumerable<string> values, Dictionary<string, int> multiplicity)
         {
-            long connectionMask = connectionId << ITEM_BITS;
-            long idMask = (1 << ITEM_BITS) - 1;
+            int connectionPart = connectionId << ITEM_BITS;
+            int idMask = (1 << ITEM_BITS) - 1;
 
             // cheating our duplicate detection a bit here - 0 is reserved so treat it as already chosen (by someone else)
-            HashSet<long> selectedIds = [0];
-            Dictionary<string, long> nameToIdMapping = [];
+            HashSet<int> selectedIds = [0];
+            Dictionary<string, int> nameToIdMapping = [];
             IEnumerable<string> valuesWithMultiplicity = values.SelectMany(v =>
             {
                 if (multiplicity.TryGetValue(v, out int count))
@@ -35,7 +35,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                 byte[] valBytes = Encoding.UTF8.GetBytes(val);
                 using MemoryStream ms = new(valBytes);
                 byte[] hash = await md5.ComputeHashAsync(ms);
-                long proposedId = 0;
+                int proposedId = 0;
                 int bitsRemaining = ITEM_BITS;
                 for (int i = 0; bitsRemaining > 0; i++)
                 {
@@ -54,9 +54,9 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
                     logger.LogError("Overspent bits during ID generation");
                 }
 
-                long finalId = Deduplicate(selectedIds, proposedId);
+                int finalId = Deduplicate(selectedIds, proposedId) & idMask;
                 selectedIds.Add(finalId);
-                long compositeId = idMask | finalId;
+                int compositeId = connectionPart | finalId;
                 nameToIdMapping.Add(val, compositeId);
             }
             // sanity check - all ids should be unique
@@ -64,10 +64,10 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             {
                 logger.LogError("Generated duplicate IDs for connection ID {}", connectionId);
             }
-            // sanity check - all ids should be 0 < x <2^53
-            foreach (KeyValuePair<string, long> pair in nameToIdMapping)
+            // sanity check - all ids should be 0 < x < 2^31 (max bound is enforced by typing)
+            foreach (KeyValuePair<string, int> pair in nameToIdMapping)
             {
-                if (pair.Value < 1 || (1L << 53) < pair.Value)
+                if (pair.Value < 1)
                 {
                     logger.LogError("ID {} for item {} in connection {} was outside the expected range", pair.Value, pair.Key, connectionId);
                 }
@@ -76,7 +76,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             return nameToIdMapping;
         }
 
-        private long Deduplicate(HashSet<long> selectedIds, long newId)
+        private int Deduplicate(HashSet<int> selectedIds, int newId)
         {
             while (selectedIds.Contains(newId))
             {

@@ -175,7 +175,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             logicOptions = logicOptions.ToDictionary(kv => kv.Key, kv => GetOptionName(kv.Value, ""));
 
             logger.LogInformation("Collecting item data");
-            Dictionary<string, long> itemNameToId = new();
+            Dictionary<string, int> itemNameToId = new();
             Dictionary<string, int> itemGeoCostCaps = new();
             HashSet<string> itemsToIgnore = [];
             if (input.IgnoredItems != null)
@@ -192,7 +192,7 @@ namespace APHKLogicExtractor.ExtractorComponents.DataExtractor
             logger.LogInformation("Collecting location data");
             Dictionary<string, LocationDetails> locations = [];
             List<string> multiLocations = [];
-            Dictionary<string, long> locationNameToId = new();
+            Dictionary<string, int> locationNameToId = new();
             if (configuration.Data?.Locations != null)
             {
                 Dictionary<string, LocationDef> locationDefs = await configuration.Data.Locations.GetContent();
