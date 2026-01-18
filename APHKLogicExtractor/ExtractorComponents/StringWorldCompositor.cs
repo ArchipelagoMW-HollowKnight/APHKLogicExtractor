@@ -60,7 +60,7 @@ internal class StringWorldCompositor(
         // add waypoints to the region list first since they usually have better names after merging
         foreach (RawWaypointDef waypoint in ctx.WaypointLogic)
         {
-            List<StatefulClause> clauses = RcUtils.GetDnfClauses(ctx.LogicManager, waypoint.name);
+            List<StatefulClause> clauses = RcUtils.GetDnfClauses(ctx.LogicManager, waypoint.name, logger);
             LogicHandling handling = waypoint.stateless ? LogicHandling.Location : LogicHandling.Default;
             objects.Add(new LogicObjectDefinition(waypoint.name, clauses, handling, waypoint.stateless));
         }

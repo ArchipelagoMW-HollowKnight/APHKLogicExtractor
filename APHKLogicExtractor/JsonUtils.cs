@@ -19,7 +19,6 @@ public static class JsonUtils
             Converters =
             {
                 new StringEnumConverter(),
-                new LogicProcessorConverter(),
                 new LMConverter(),
                 new RandoContextConverter()
             }
@@ -39,7 +38,6 @@ public static class JsonUtils
             {
                 new StringEnumConverter(),
                 new MaybeFileConverter(resourceLoader),
-                new LogicProcessorConverter(),
                 new LMConverter(),
                 new RandoContextConverter()
             }

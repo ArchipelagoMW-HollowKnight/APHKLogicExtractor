@@ -1,0 +1,2 @@
+﻿global using Expr = RandomizerCore.StringParsing.Expression<RandomizerCore.StringLogic.LogicExpressionType>;
+global using Atom = RandomizerCore.StringParsing.AtomExpression<RandomizerCore.StringLogic.LogicExpressionType>;

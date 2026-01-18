@@ -1,16 +1,16 @@
-﻿using APHKLogicExtractor.ExtractorComponents.RegionExtractor;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringLogic;
+using RandomizerCore;
 
 namespace APHKLogicExtractor.DataModel
 {
-    internal class StatefulClause
+    internal class StatefulClause : IEquatable<StatefulClause>
     {
-        public TermToken? StateProvider { get; }
-        public IReadOnlySet<TermToken> Conditions { get; }
-        public IReadOnlyList<TermToken> StateModifiers { get; }
+        public Expr? StateProvider { get; }
+        public IReadOnlySet<Expr> Conditions { get; }
+        public IReadOnlyList<Expr> StateModifiers { get; }
 
         [JsonConstructor]
         private StatefulClause(
@@ -20,17 +20,17 @@ namespace APHKLogicExtractor.DataModel
         {
             if (stateProvider != null)
             {
-                StateProvider = Utils.ParseSingleToken(stateProvider);
+                StateProvider = LogicExpressionUtil.Parse(stateProvider);
             }
-            Conditions = conditions.Select(Utils.ParseSingleToken).ToHashSet();
-            StateModifiers = stateModifiers.Select(Utils.ParseSingleToken).ToList();
+            Conditions = conditions.Select(LogicExpressionUtil.Parse).ToHashSet();
+            StateModifiers = [.. stateModifiers.Select(LogicExpressionUtil.Parse)];
             if (StateProvider == null && StateModifiers.Count > 0)
             {
                 throw new ArgumentException($"No state-providing token was provided", nameof(stateProvider));
             }
         }
 
-        public StatefulClause(TermToken? stateProvider, IReadOnlySet<TermToken> conditions, IReadOnlyList<TermToken> stateModifiers)
+        public StatefulClause(Expr? stateProvider, IReadOnlySet<Expr> conditions, IReadOnlyList<Expr> stateModifiers)
         {
             StateProvider = stateProvider;
             Conditions = conditions;
@@ -42,75 +42,26 @@ namespace APHKLogicExtractor.DataModel
         }
 
         /// <summary>
-        /// Creates a stateful clause from a term token sequence. Assumed that FALSE has been removed and the clause
+        /// Creates a stateful clause from a ReadOnlyConjunction
         /// has a state provider.
         /// </summary>
-        public StatefulClause(LogicManager lm, IEnumerable<TermToken> clause)
+        public StatefulClause(LogicManager lm, DNFLogicDef.ReadOnlyConjunction clause)
         {
-            HashSet<TermToken> conditions = [];
-            List<TermToken> stateModifiers = [];
+            HashSet<Expr> conditions = [];
+            List<Expr> stateModifiers = [];
 
-            foreach (TermToken token in clause)
+            StateProvider = clause.StateProvider?.ToExpression();
+            foreach (TermValue termReq in clause.TermReqs)
             {
-                if (token is SimpleToken st)
-                {
-                    if (lm.GetTerm(st.Name) is Term t)
-                    {
-                        if (t.Type == TermType.State && StateProvider == null)
-                        {
-                            StateProvider = token;
-                        }
-                        else
-                        {
-                            conditions.Add(token);
-                        }
-                    }
-                    else if (lm.GetVariable(st.Name) is LogicVariable v)
-                    {
-                        if (v is IStateProvider && StateProvider == null)
-                        {
-                            StateProvider = token;
-                        }
-                        else if (v is StateModifier)
-                        {
-                            stateModifiers.Add(st);
-                        }
-                        else
-                        {
-                            conditions.Add(token);
-                        }
-                    }
-                    else
-                    {
-                        throw new ArgumentException($"A token of an unknown type was provided: {token}", nameof(clause));
-                    }
-                }
-                else if (token is ReferenceToken)
-                {
-                    if (StateProvider == null)
-                    {
-                        StateProvider = token;
-                    }
-                    else
-                    {
-                        conditions.Add(token);
-                    }
-                }
-                else if (token is ComparisonToken ct)
-                {
-                    if (lm.GetVariable(ct.Left) is StateAccessVariable || lm.GetVariable(ct.Right) is StateAccessVariable)
-                    {
-                        stateModifiers.Add(ct);
-                    }
-                    else
-                    {
-                        conditions.Add(ct);
-                    }
-                }
-                else
-                {
-                    conditions.Add(token);
-                }
+                conditions.Add(termReq.ToExpression());
+            }
+            foreach (LogicInt varReq in clause.VarReqs)
+            {
+                conditions.Add(varReq.ToExpression());
+            }
+            foreach (StateModifier modifier in clause.StateModifiers)
+            {
+                stateModifiers.Add(modifier.ToExpression());
             }
 
             Conditions = conditions;
@@ -121,30 +72,32 @@ namespace APHKLogicExtractor.DataModel
             }
         }
 
-        public List<TermToken> ToTokens()
+        public Expr ToExpression()
         {
+            List<Expr> parts;
             if (StateProvider == null)
             {
-                return [
+                parts = [
                     .. Conditions,
                     .. StateModifiers
                 ];
             }
-
-            return [
-                StateProvider,
+            else
+            {
+                parts = [
+                    StateProvider,
                 .. Conditions,
                 .. StateModifiers
-            ];
+                ];
+            }
+            LogicExpressionBuilder builder = new();
+            return builder.ApplyInfixOperatorLeftAssoc(parts.DefaultIfEmpty(builder.NameAtom("NONE")), builder.Op("+"));
         }
 
         public override string ToString()
         {
-            string inner = string.Join(" + ", ToTokens().Select(x => x.Write()));
-            return $"({inner})";
+            return $"({ToExpression().Print()})";
         }
-
-
 
         public (HashSet<string> itemReqs, HashSet<string> locationReqs, HashSet<string> regionReqs)
             PartitionRequirements(LogicManager? lm)
@@ -152,43 +105,69 @@ namespace APHKLogicExtractor.DataModel
             HashSet<string> items = new HashSet<string>();
             HashSet<string> locations = new HashSet<string>();
             HashSet<string> regions = new HashSet<string>();
-            foreach (TermToken t in Conditions)
+            foreach (Expr expr in Conditions)
             {
-                if (t is ReferenceToken rt)
+                switch (expr)
                 {
-                    locations.Add(rt.Target);
-                }
-                else if (t is ProjectedToken pt)
-                {
-                    if (pt.Inner is ReferenceToken rtt)
-                    {
-                        locations.Add(rtt.Target);
-                    }
-                    else
-                    {
-                        regions.Add(pt.Inner.Write());
-                    }
-                }
-                else
-                {
-                    // bug workaround - at the time of writing, projection tokens are flattened by RC
-                    // so we have to semantically check our item requirements to see if they should have been projected
-                    string token = t.Write();
-                    if (lm != null && lm.GetTransition(token) != null)
-                    {
-                        regions.Add(token);
-                    }
-                    else if (lm != null && lm.Waypoints.Any(w => w.Name == token && w.term.Type == TermType.State))
-                    {
-                        regions.Add(token);
-                    }
-                    else
-                    {
-                        items.Add(token);
-                    }
+                    case ReferenceExpression { Operand: Atom a }:
+                        locations.Add(a.Token.Print());
+                        break;
+                    case ProjectionExpression { Operand: ReferenceExpression { Operand: Atom a } }:
+                        locations.Add(a.Token.Print());
+                        break;
+                    case ProjectionExpression { Operand: Atom a }:
+                        regions.Add(a.Token.Print());
+                        break;
+                    case Atom a:
+                        items.Add(a.Token.Print());
+                        break;
+                    case ComparisonExpression { Left: Atom, Right: Atom } ce:
+                        items.Add(ce.Print());
+                        break;
+                    default:
+                        throw new ArgumentException("Unsupported expression type");
                 }
             }
             return (items, locations, regions);
+        }
+
+        public bool Equals(StatefulClause? other)
+        {
+            if (other == null)
+            {
+                return false;
+            }
+
+            if (StateProvider != other.StateProvider)
+            {
+                return false;
+            }
+
+            if (Conditions.Count != other.Conditions.Count)
+            {
+                return false;
+            }
+            foreach (Expr cond in Conditions)
+            {
+                if (!other.Conditions.Contains(cond))
+                {
+                    return false;
+                }
+            }
+
+            if (StateModifiers.Count != other.StateModifiers.Count)
+            {
+                return false;
+            }
+            for (int i = 0; i < StateModifiers.Count; i++)
+            {
+                if (StateModifiers[i] != other.StateModifiers[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

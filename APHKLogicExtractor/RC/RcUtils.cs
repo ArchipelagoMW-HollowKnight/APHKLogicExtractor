@@ -1,8 +1,10 @@
 using APHKLogicExtractor.DataModel;
+using Microsoft.Extensions.Logging;
 using RandomizerCore.Logic;
 using RandomizerCore.Logic.StateLogic;
 using RandomizerCore.StringItems;
 using RandomizerCore.StringLogic;
+using RandomizerCore.StringParsing;
 
 namespace APHKLogicExtractor.RC;
 
@@ -67,9 +69,11 @@ internal class RcUtils
             itemTemplates = await configuration.Logic.Items.GetContent();
         }
 
-        LogicManagerBuilder lmb = new() { VariableResolver = new DummyVariableResolver() };
-        lmb.LP.SetMacro(macroLogic);
-        lmb.StateManager.AppendRawStateData(stateData);
+        LogicManagerBuilder lmb = new() { VariableResolver = new DummyVariableResolver(stateData) };
+        foreach (KeyValuePair<string, string> macro in macroLogic)
+        {
+            lmb.AddMacro(macro);
+        }
         foreach (Term term in terms)
         {
             lmb.GetOrAddTerm(term.Name, term.Type);
@@ -97,25 +101,25 @@ internal class RcUtils
             macroLogic, waypointLogic, itemTemplates);
     }
 
-    public static List<StatefulClause> GetDnfClauses(LogicManager lm, string name)
+    public static List<StatefulClause> GetDnfClauses(LogicManager lm, string name, ILogger? logger = null)
     {
         LogicDef def = lm.GetLogicDefStrict(name);
         if (def is not DNFLogicDef dd)
         {
             dd = lm.CreateDNFLogicDef(def.Name, def.ToLogicClause());
         }
-        return GetDnfClauses(lm, dd);
+        return GetDnfClauses(lm, dd, logger);
     }
 
-    public static List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd)
+    public static List<StatefulClause> GetDnfClauses(LogicManager lm, DNFLogicDef dd, ILogger? logger = null)
     {
-        // remove FALSE clauses, and remove TRUE from all clauses
-        IEnumerable<IEnumerable<TermToken>> clauses = dd.ToTermTokenSequences()
-            .Where(x => !x.Contains(ConstToken.False));
-        if (!clauses.Any())
+        LogicExpressionBuilder builder = new();
+        List<DNFLogicDef.ReadOnlyConjunction> conjunctions = [.. dd.GetAllConjunctions()];
+        if (conjunctions.Count == 0)
         {
-            return [new StatefulClause(null, new HashSet<TermToken>(1) { ConstToken.False }, [])];
+            return [new StatefulClause(null, new HashSet<Expression<LogicExpressionType>>(1) { builder.NameAtom("NONE") }, [])];
         }
-        return clauses.Select(x => new StatefulClause(lm, x.Where(x => x != ConstToken.True))).ToList();
+
+        return [.. conjunctions.Select(c => new StatefulClause(lm, c))];
     }
 }
