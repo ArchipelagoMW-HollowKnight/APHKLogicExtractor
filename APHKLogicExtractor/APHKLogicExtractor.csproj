@@ -16,7 +16,7 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="RandomizerCore" Version="3.0.0-dev.4" />
+    <PackageReference Include="RandomizerCore" Version="2.1.2" />
     <PackageReference Include="RandomizerCore.Json" Version="1.1.0" />
   </ItemGroup>
 
