@@ -20,18 +20,17 @@ internal record JsonLogicConfiguration
         List<JsonLogicConfiguration> finalConfigs = [];
         foreach (JsonLogicConfiguration conf in configs)
         {
-            if (conf.Logic == null || (conf.Logic.Include == null && conf.Logic.Exclude == null))
+            if (conf.Logic == null || (conf.Logic.Include == null && conf.Logic.Exclude == null && conf.Logic.LocationsAsEvents == null))
             {
                 finalConfigs.Add(conf);
                 continue;
             }
 
-            List<RawWaypointDef> waypoints = [];
-            if (conf.Logic.Waypoints != null)
+            HashSet<string> locationsAsEvents = [];
+            if (conf.Logic.LocationsAsEvents != null)
             {
-                waypoints = await conf.Logic.Waypoints.GetContent();
+                locationsAsEvents = await conf.Logic.LocationsAsEvents.GetContent();
             }
-            Dictionary<string, RawWaypointDef> waypointLookup = waypoints.ToDictionary(w => w.name);
 
             List<RawLogicDef> locations = [];
             if (conf.Logic.Locations != null)
@@ -39,6 +38,22 @@ internal record JsonLogicConfiguration
                 locations = await conf.Logic.Locations.GetContent();
             }
             Dictionary<string, RawLogicDef> locationLookup = locations.ToDictionary(l => l.name);
+
+            List<RawWaypointDef> waypoints = [];
+            for (int i = 0; i < locations.Count; i++)
+            {
+                if (locationsAsEvents.Contains(locations[i].name))
+                {
+                    waypoints.Add(new RawWaypointDef(locations[i].name, locations[i].logic, true));
+                    locations.RemoveAt(i);
+                    i--;
+                }
+            }
+            if (conf.Logic.Waypoints != null)
+            {
+                waypoints = await conf.Logic.Waypoints.GetContent();
+            }
+            Dictionary<string, RawWaypointDef> waypointLookup = waypoints.ToDictionary(w => w.name);
 
             List<RawLogicDef> transitions = [];
             if (conf.Logic.Transitions != null)
@@ -351,5 +366,7 @@ internal record JsonLogic
     /// item.
     /// </summary>
     public MaybeFile<HashSet<string>>? Exclude { get; set; }
+
+    public MaybeFile<HashSet<string>>? LocationsAsEvents { get; set; }
 
 }

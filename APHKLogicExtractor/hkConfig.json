@@ -33,6 +33,17 @@
           "Defeated_Pantheon_5"
         ]
       }
+    },
+    {
+      "logic": {
+        "locations": "https://raw.githubusercontent.com/nerthul11/FlowerRandomizer/refs/heads/master/Resources/Logic/locations.json",
+        "include": [
+          "Flower_Quest-Godseeker"
+        ],
+        "locationsAsEvents": [
+          "Flower_Quest-Godseeker"
+        ]
+      }
     }
   ],
   "startStateTerm": "Start_State",
