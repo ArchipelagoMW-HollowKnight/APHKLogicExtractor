@@ -515,7 +515,7 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             else
             {
-                newBranches = right;
+                newBranches = left;
             }
             return newBranches;
         }
