@@ -238,17 +238,10 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             {
                 RemoveRedundantLogicBranches(classifier);
             }
-            foreach (Region region in regions.Values)
-            {
-                foreach (Connection connection in region.Exits)
-                {
-                    connection.Logic.RemoveAll(x => x.IsEmpty);
-                }
-            }
-            foreach (GraphLocation location in locations.Values)
-            {
-                location.Logic.RemoveAll(x => x.IsEmpty);
-            }
+            // we must do this LAST (and not during RemoveRedundantLogicBranches) because
+            // logic objects with a non-empty list of empty branches need to retain that empty branch
+            // to dominate other terms which may arrive during DistributeBranches or other merges
+            CanonicalizeEmptyBranches();
         }
 
         private void RemoveRegion(string name)
@@ -518,6 +511,18 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
                 newBranches = [.. left];
             }
             return newBranches;
+        }
+
+        private void CanonicalizeEmptyBranches()
+        {
+            IEnumerable<IGraphLogicObject> logicToReduce = regions.Values
+                .SelectMany<Region, IGraphLogicObject>(r => r.Exits)
+                .Concat(locations.Values)
+                .Concat(transitions.Values);
+            foreach (IGraphLogicObject o in logicToReduce)
+            {
+                o.Logic.RemoveAll(x => x.IsEmpty);
+            }
         }
     }
 }
