@@ -511,11 +511,11 @@ namespace APHKLogicExtractor.ExtractorComponents.RegionExtractor
             }
             else if (left.Count == 0)
             {
-                newBranches = right;
+                newBranches = [.. right];
             }
             else
             {
-                newBranches = left;
+                newBranches = [.. left];
             }
             return newBranches;
         }
